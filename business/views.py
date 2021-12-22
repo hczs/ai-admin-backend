@@ -1,0 +1,179 @@
+import os
+import shutil
+import zipfile
+
+from django.conf import settings
+from django.shortcuts import render
+
+# Create your views here.
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin
+from rest_framework.parsers import MultiPartParser, JSONParser
+from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
+
+from business.filter import FileFilter, TaskFilter
+from business.models import File, Task
+from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
+from business.threads import ExecuteCommandThread
+
+
+class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin, GenericViewSet):
+    queryset = File.objects.all()
+    serializer_class = FileSerializer
+    parser_classes = [MultiPartParser, JSONParser]
+    filter_class = FileFilter
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return FileListSerializer
+        else:
+            return FileSerializer
+
+    def perform_create(self, serializer):
+        """
+        数据集文件上传预处理
+        """
+        my_file = self.request.FILES.get('dataset', None)
+        if not my_file:
+            return Response(data={'detail': '未检测到文件！'}, status=status.HTTP_400_BAD_REQUEST)
+        if 'zip' not in my_file.content_type:
+            return Response(data={'detail': '请上传zip类型的文件！'}, status=status.HTTP_400_BAD_REQUEST)
+        path = settings.DATASET_PATH
+        # 目录不存在则新建目录
+        if not os.path.isdir(path):
+            os.makedirs(path)
+        file_size = my_file.size
+        original_file_name, ext = os.path.splitext(my_file.name)
+        file_path = file_duplication_handle(original_file_name, ext, path, 1)  # zip文件路径
+        path, file_name_and_ext = os.path.split(file_path)
+        file_name, ext = os.path.splitext(file_name_and_ext)
+        extract_path = os.path.join(path, file_name)  # 解压目录，解压到zip文件名下的文件夹目录
+        with open(os.path.join(path, file_name_and_ext), 'wb+') as f:
+            for chunk in my_file.chunks():
+                f.write(chunk)
+            # 写入完毕解压缩文件
+            zip_file = zipfile.ZipFile(f)
+            zip_list = zip_file.namelist()
+            for e in zip_list:
+                zip_file.extract(e, extract_path)
+            zip_file.close()
+        serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, extract_path=extract_path)
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        # 删除记录后删除对应文件
+        os.remove(instance.file_path)
+        shutil.rmtree(instance.extract_path)
+
+
+class TaskViewSet(ModelViewSet):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+    filter_class = TaskFilter
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return TaskListSerializer
+        else:
+            return TaskSerializer
+
+    @action(methods=['get'], detail=True)
+    def execute(self, request, *args, **kwargs):
+        task = self.get_object()
+        # 变更任务状态
+        if task.task_status != 0:
+            return Response(data={'detail': '任务正在执行中或已完成，请勿重复执行！'}, status=status.HTTP_400_BAD_REQUEST)
+        task.task_status = 1
+        task.save()
+        # 获取任务数据，组装命令
+        task_param = ['task', 'model', 'dataset', 'config_file', 'saved_model', 'train', 'batch_size', 'train_rate',
+                      'eval_rate', 'learning_rate', 'max_epoch', 'gpu', 'gpu_id']
+        str_command = 'python ' + settings.RUN_MODEL_PATH
+        for param in task_param:
+            param_value = getattr(task, param)
+            if param == 'config_file' and param_value is not None:
+                path, param_value = os.path.split(param_value)
+            str_command += ' --' + param + ' ' + str(param_value)
+        # 启动执行任务线程
+        ExecuteCommandThread(task.task_name, str_command).start()
+        return Response(status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(methods=['post'], request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['task_name'],
+        properties={'task_name': openapi.Schema(type=openapi.TYPE_STRING)}
+    ))
+    @action(methods=['post'], detail=False)
+    def exists(self, request):
+        """
+        检测任务是否存在
+        """
+        task_name = request.data.get('task_name')
+        tasks = Task.objects.filter(task_name=task_name).all()
+        if len(tasks) == 0:
+            return Response(status=status.HTTP_200_OK)
+        else:
+            return Response(data={'msg': '任务已存在！', 'id': tasks[0].id}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=False)
+    def upload(self, request):
+        """
+        任务配置文件上传，返回文件存储路径
+        此配置文件应该放在AI项目根目录下，因为多任务，所以要根据配置文件名来区分
+        """
+        my_file = request.FILES.get('config', None)
+        if not my_file:
+            return Response(data={'detail': '未检测到文件！'}, status=status.HTTP_400_BAD_REQUEST)
+        path = settings.TASK_PARAM_PATH
+        # 目录不存在则新建目录
+        if not os.path.isdir(path):
+            os.makedirs(path)
+        original_file_name, ext = os.path.splitext(my_file.name)
+        file_path = file_duplication_handle(original_file_name, ext, path, 1)
+        path, file_name_and_ext = os.path.split(file_path)
+        with open(os.path.join(path, file_name_and_ext), 'wb+') as f:
+            for chunk in my_file.chunks():
+                f.write(chunk)
+        # 返回文件存储路径
+        return Response(file_path)
+
+    def perform_create(self, serializer):
+        """
+        创建任务时添加任务创建者
+        """
+        account = self.request.user
+        serializer.save(creator=account)
+
+
+def file_duplication_handle(original_file_name, ext, path, index):
+    """
+    检测文件名是否重复，若重复则将文件名加(index)后缀
+    """
+    file_path = path + original_file_name + ext
+    if os.path.isfile(file_path):
+        tmp_file_name = original_file_name + '(' + str(index) + ')'
+        file_path = path + tmp_file_name + ext
+        if os.path.isfile(file_path):
+            return file_duplication_handle(original_file_name, ext, path, index+1)
+        else:
+            return file_path
+    else:
+        return file_path
+
+
+def extract_without_folder(arc_name, full_item_name, folder):
+    """
+    解压压缩包中的指定文件到指定目录
+
+    :param arc_name: 压缩包文件
+    :param full_item_name: 压缩包中指定文件的全路径，相对压缩包的相对路径
+    :param folder: 解压的目标目录，绝对路径
+    """
+    with zipfile.ZipFile(arc_name) as zf:
+        file_data = zf.read(full_item_name)
+    with open(os.path.join(folder, os.path.basename(full_item_name)), "wb") as file_out:
+        file_out.write(file_data)
