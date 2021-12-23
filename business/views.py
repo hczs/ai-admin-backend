@@ -97,11 +97,13 @@ class TaskViewSet(ModelViewSet):
             param_value = getattr(task, param)
             if param == 'config_file' and param_value is not None:
                 path, param_value = os.path.split(param_value)
+                param_value, file_type = os.path.splitext(param_value)
             str_command += ' --' + param + ' ' + str(param_value)
+        print(str_command)
         # 启动执行任务线程
         ExecuteCommandThread(task.task_name, str_command).start()
         return Response(status=status.HTTP_200_OK)
-
+#
     @swagger_auto_schema(methods=['post'], request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
         required=['task_name'],
