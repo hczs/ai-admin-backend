@@ -1,1 +1,2 @@
-# ai-admin-backend
+# AI管理平台
+项目部署地址演示：http://49.233.159.81:26352/#/login
