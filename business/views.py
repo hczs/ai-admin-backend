@@ -3,13 +3,14 @@ import shutil
 import zipfile
 
 from django.conf import settings
+from django.http import FileResponse
 from django.shortcuts import render
 
 # Create your views here.
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import status
-from rest_framework.decorators import action
+from rest_framework import status, renderers
+from rest_framework.decorators import action, renderer_classes
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin
 from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework.response import Response
@@ -19,6 +20,7 @@ from business.filter import FileFilter, TaskFilter
 from business.models import File, Task
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
 from business.threads import ExecuteCommandThread
+from common.response import PassthroughRenderer
 
 
 class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin, GenericViewSet):
@@ -33,15 +35,31 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         else:
             return FileSerializer
 
-    def perform_create(self, serializer):
-        """
-        数据集文件上传预处理
-        """
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json']
         my_file = self.request.FILES.get('dataset', None)
         if not my_file:
             return Response(data={'detail': '未检测到文件！'}, status=status.HTTP_400_BAD_REQUEST)
         if 'zip' not in my_file.content_type:
             return Response(data={'detail': '请上传zip类型的文件！'}, status=status.HTTP_400_BAD_REQUEST)
+        # 数据包文件格式检查
+        zip_file = zipfile.ZipFile(my_file)
+        zip_list = zip_file.namelist()
+        for e in zip_list:
+            file_name, ext = os.path.splitext(e)
+            if (ext != "" or len(ext) != 0) and ext not in atomic_file_ext:
+                return Response(data={'detail': '数据包中文件格式不正确，请上传原子文件'}, status=status.HTTP_400_BAD_REQUEST)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer):
+        """
+        数据集文件上传处理
+        """
+        my_file = self.request.FILES.get('dataset', None)
         path = settings.DATASET_PATH
         # 目录不存在则新建目录
         if not os.path.isdir(path):
@@ -52,14 +70,19 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         path, file_name_and_ext = os.path.split(file_path)
         file_name, ext = os.path.splitext(file_name_and_ext)
         extract_path = os.path.join(path, file_name)  # 解压目录，解压到zip文件名下的文件夹目录
+        # 创建解压目录
+        if not os.path.isdir(extract_path):
+            os.makedirs(extract_path)
         with open(os.path.join(path, file_name_and_ext), 'wb+') as f:
             for chunk in my_file.chunks():
                 f.write(chunk)
             # 写入完毕解压缩文件
             zip_file = zipfile.ZipFile(f)
             zip_list = zip_file.namelist()
-            for e in zip_list:
-                zip_file.extract(e, extract_path)
+            for every in zip_list:
+                tmp_name, ext = os.path.splitext(every)
+                if (ext != "" or len(ext) != 0) and tmp_name:
+                    extract_without_folder(f, every, extract_path)
             zip_file.close()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, extract_path=extract_path)
 
@@ -68,6 +91,18 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         # 删除记录后删除对应文件
         os.remove(instance.file_path)
         shutil.rmtree(instance.extract_path)
+
+    @renderer_classes((PassthroughRenderer,))
+    @action(methods=['get'], detail=False)
+    def download(self, request):
+        """
+        数据集样例文件下载
+        """
+        file_path = settings.DATASET_EXAMPLE_PATH
+        response_file = FileResponse(open(file_path, 'rb'))
+        response_file['content_type'] = "application/octet-stream"
+        response_file['Content-Disposition'] = 'attachment; filename=' + os.path.basename(file_path)
+        return response_file
 
 
 class TaskViewSet(ModelViewSet):
@@ -177,5 +212,7 @@ def extract_without_folder(arc_name, full_item_name, folder):
     """
     with zipfile.ZipFile(arc_name) as zf:
         file_data = zf.read(full_item_name)
+    # 中文乱码解决
+    full_item_name = full_item_name.encode('cp437').decode('gbk')
     with open(os.path.join(folder, os.path.basename(full_item_name)), "wb") as file_out:
         file_out.write(file_data)

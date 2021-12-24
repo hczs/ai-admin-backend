@@ -199,6 +199,10 @@ RUN_MODEL_PATH = 'C:\\Users\\lenovo\\PycharmProjects\\Bigscity-LibCity\\run_mode
 # 监控任务执行的线程，多长时间获取一次任务执行线程的状态（秒）暂时不用
 MONITORING_FREQUENCY = 1
 
+# 样例文件相关
+# 数据集样例文件
+DATASET_EXAMPLE_PATH = 'D:\\upload\\raw_data\\METR_LA.zip'
+
 # 日志配置
 LOGGING = {
     'version': 1,

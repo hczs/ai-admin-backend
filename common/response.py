@@ -1,3 +1,4 @@
+from rest_framework import renderers
 from rest_framework.renderers import JSONRenderer
 
 
@@ -14,6 +15,17 @@ class BaseResponse(object):
     @property
     def dict(self):
         return self.__dict__
+
+
+class PassthroughRenderer(renderers.BaseRenderer):
+    """
+    文件下载响应渲染
+    """
+    media_type = ''
+    format = ''
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
 
 
 class FitJSONRenderer(JSONRenderer):
