@@ -188,6 +188,18 @@ class TaskViewSet(ModelViewSet):
         # 返回文件存储路径
         return Response(file_path)
 
+    @renderer_classes((PassthroughRenderer,))
+    @action(methods=['get'], detail=False)
+    def download_config(self, request):
+        """
+        参数配置文件样例文件下载
+        """
+        file_path = settings.TASK_PARAM_EXAMPLE_PATH
+        response_file = FileResponse(open(file_path, 'rb'))
+        response_file['content_type'] = "application/octet-stream"
+        response_file['Content-Disposition'] = 'attachment; filename=' + os.path.basename(file_path)
+        return response_file
+
     def perform_create(self, serializer):
         """
         创建任务时添加任务创建者

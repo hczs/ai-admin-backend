@@ -200,7 +200,7 @@ MONITORING_FREQUENCY = 1
 # 样例文件相关
 # 数据集样例文件
 DATASET_EXAMPLE_PATH = 'D:\\upload\\raw_data\\METR_LA.zip'
-
+TASK_PARAM_EXAMPLE_PATH = 'D:\\upload\\param\\config.json'
 # 日志配置
 LOGGING = {
     'version': 1,
