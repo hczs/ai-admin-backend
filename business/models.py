@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from django.db import models
 
 # Create your models here.
@@ -24,12 +26,13 @@ class Task(BaseModel):
     task_name = models.CharField(max_length=50, unique=True)
     task_description = models.CharField(max_length=150, null=True)
     creator = models.ForeignKey(Account, null=True, db_constraint=False, on_delete=models.SET_NULL)
-    data_file = models.ForeignKey(File, null=True, db_constraint=False, on_delete=models.SET_NULL)
+    execute_time = models.DateTimeField(null=True)
+    execute_end_time = models.DateTimeField(null=True)
     task_status = models.IntegerField(default=0)
     # 以下是任务执行参数
     task = models.CharField(max_length=30)
     model = models.CharField(max_length=30)
-    dataset = models.CharField(max_length=30)
+    dataset = models.CharField(max_length=100)
     config_file = models.CharField(max_length=100, null=True)
     saved_model = models.BooleanField(null=True)
     train = models.BooleanField(null=True)
