@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 import zipfile
 
 from django.conf import settings
@@ -18,8 +19,8 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from business.filter import FileFilter, TaskFilter
 from business.models import File, Task
+from business.scheduler import task_execute_at, task_is_exists, remove_task
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
-from business.threads import ExecuteCommandThread
 from common.response import PassthroughRenderer
 
 
@@ -118,12 +119,14 @@ class TaskViewSet(ModelViewSet):
 
     @action(methods=['get'], detail=True)
     def execute(self, request, *args, **kwargs):
+        """
+        执行任务，需要传递execute_time参数为具体执行时间，如果不传参代表立即执行
+        """
+        execute_time = request.query_params.get('execute_time')
         task = self.get_object()
-        # 变更任务状态
+        # 检查任务是否可执行
         if task.task_status != 0:
             return Response(data={'detail': '任务正在执行中或已完成，请勿重复执行！'}, status=status.HTTP_400_BAD_REQUEST)
-        task.task_status = 1
-        task.save()
         # 获取任务数据，组装命令
         task_param = ['task', 'model', 'dataset', 'config_file', 'saved_model', 'train', 'batch_size', 'train_rate',
                       'eval_rate', 'learning_rate', 'max_epoch', 'gpu', 'gpu_id']
@@ -133,8 +136,17 @@ class TaskViewSet(ModelViewSet):
             if param == 'config_file' and param_value is not None:
                 path, param_value = os.path.split(param_value)
             str_command += ' --' + param + ' ' + str(param_value)
-        # 启动执行任务线程
-        ExecuteCommandThread(task.task_name, str_command).start()
+        # 检查任务是否已经加入过队列中，如果已经存在，把之前的移除，以本次提交为准
+        if task_is_exists(str(task.id)):
+            remove_task(str(task.id))
+        # 添加任务到执行队列中，不传execute_time就代表立即执行
+        task_execute_at(task.task_name, str_command, execute_time, str(task.id))
+        # 更新任务执行时间信息
+        if execute_time:
+            task.execute_time = execute_time
+        else:
+            task.execute_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+        task.save()
         return Response(status=status.HTTP_200_OK)
 
     @swagger_auto_schema(methods=['post'], request_body=openapi.Schema(
@@ -193,7 +205,7 @@ def file_duplication_handle(original_file_name, ext, path, index):
         tmp_file_name = original_file_name + '(' + str(index) + ')'
         file_path = path + tmp_file_name + ext
         if os.path.isfile(file_path):
-            return file_duplication_handle(original_file_name, ext, path, index+1)
+            return file_duplication_handle(original_file_name, ext, path, index + 1)
         else:
             return file_path
     else:
