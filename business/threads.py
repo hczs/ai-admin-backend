@@ -24,7 +24,19 @@ class ExecuteCommandThread(threading.Thread):
         # 把自己加到监控线程中
         # MonitorThread(self.name, self.name + '-MonitorThread').start()
 
+class ExecuteGeojsonThread(threading.Thread):
+    """
+    执行命令行命令线程，执行传入的命令str_command
+    """
+    def __init__(self, thread_name, str_command):
+        self.str_command = str_command
+        super(ExecuteGeojsonThread, self).__init__(name=thread_name)
 
+    def run(self):
+        os.system(self.str_command)
+
+        # 把自己加到监控线程中
+        # MonitorThread(self.name, self.name + '-MonitorThread').start()
 # class MonitorThread(threading.Thread):
 #     """
 #     监控线程，监控某个线程实例是否运行结束

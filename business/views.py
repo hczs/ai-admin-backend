@@ -18,8 +18,9 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from business.filter import FileFilter, TaskFilter
 from business.models import File, Task
+from business.save_geojson import transfer_geo_json
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
-from business.threads import ExecuteCommandThread
+from business.threads import ExecuteCommandThread, ExecuteGeojsonThread
 from common.response import PassthroughRenderer
 
 
@@ -84,6 +85,9 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                 if (ext != "" or len(ext) != 0) and tmp_name:
                     extract_without_folder(f, every, extract_path)
             zip_file.close()
+        # 启动执行任务线程
+        str_command = 'python D:\\PycharmProjects\\ai-admin-backend\\business\\save_geojson.py --dataset '+file_name+' --save_path '+extract_path+'_geo_json'
+        ExecuteGeojsonThread(file_name, str_command).start()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, extract_path=extract_path)
 
     def perform_destroy(self, instance):
@@ -104,6 +108,17 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         response_file['Content-Disposition'] = 'attachment; filename=' + os.path.basename(file_path)
         return response_file
 
+    @action(methods=['get'], detail=True)
+    def get_gis_view(self, request, *args, **kwargs):
+        """
+        根据任务id获取geojson转化的gis图象
+        """
+        file = self.get_object()
+        print(file)
+        file_name = file.file_name # wheather pk or exp_id
+        file_gis_path = settings.DATASET_PATH+str(file_name)+'_geo_json'
+        transfer_geo_json(file_gis_path, file_name)
+        return file_gis_path
 
 class TaskViewSet(ModelViewSet):
     queryset = Task.objects.all()
@@ -127,7 +142,7 @@ class TaskViewSet(ModelViewSet):
         # 获取任务数据，组装命令
         task_param = ['task', 'model', 'dataset', 'config_file', 'saved_model', 'train', 'batch_size', 'train_rate',
                       'eval_rate', 'learning_rate', 'max_epoch', 'gpu', 'gpu_id']
-        str_command = 'python ' + settings.RUN_MODEL_PATH
+        str_command = 'python ' + settings.RUN_MODEL_PATH + ' --exp_id '+str(task.pk)
         for param in task_param:
             param_value = getattr(task, param)
             if param == 'config_file' and param_value is not None:
@@ -185,6 +200,31 @@ class TaskViewSet(ModelViewSet):
         account = self.request.user
         serializer.save(creator=account)
 
+    @renderer_classes((PassthroughRenderer,))
+    @action(methods=['get'], detail=False)
+    def download_config(self, request):
+        """
+        参数配置文件样例文件下载
+        """
+        file_path = settings.TASK_PARAM_EXAMPLE_PATH
+        response_file = FileResponse(open(file_path, 'rb'))
+        response_file['content_type'] = "application/octet-stream"
+        response_file['Content-Disposition'] = 'attachment; filename=' + os.path.basename(file_path)
+        return response_file
+
+    @action(methods=['get'], detail=True)
+    def get_result(self, request, *args, **kwargs):
+        """
+        根据任务id获取结果
+        """
+        task = self.get_object()
+        print(task)
+        # 变更任务状态
+        if task.task_status != 2:
+            return Response(data={'detail': '任务尚未输出结果'}, status=status.HTTP_400_BAD_REQUEST)
+        file_id = task.pk # wheather pk or exp_id
+        file_path = settings.RESULT_PATH+str(file_id)
+        return Response(file_path)
 
 def file_duplication_handle(original_file_name, ext, path, index):
     """

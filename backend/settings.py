@@ -195,14 +195,14 @@ DATASET_PATH = 'D:\\upload\\raw_data\\'
 # 任务参数json文件上传路径
 TASK_PARAM_PATH = 'D:\\upload\\param\\'
 # run_model.py脚本文件位置
-RUN_MODEL_PATH = 'C:\\Users\\lenovo\\PycharmProjects\\Bigscity-LibCity\\run_model.py'
+RUN_MODEL_PATH = 'D:\\PycharmProjects\\Bigscity-LibCity\\run_model.py'
 # 监控任务执行的线程，多长时间获取一次任务执行线程的状态（秒）暂时不用
 MONITORING_FREQUENCY = 1
 
 # 样例文件相关
 # 数据集样例文件
 DATASET_EXAMPLE_PATH = 'D:\\upload\\raw_data\\METR_LA.zip'
-
+TASK_PARAM_EXAMPLE_PATH = 'D:\\upload\\param\\config.json'
 # 日志配置
 LOGGING = {
     'version': 1,
