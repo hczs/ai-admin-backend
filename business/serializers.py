@@ -30,7 +30,6 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class TaskListSerializer(serializers.ModelSerializer):
-    data_file = serializers.StringRelatedField()
     creator = serializers.StringRelatedField()
 
     class Meta:
