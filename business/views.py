@@ -19,8 +19,8 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from business.filter import FileFilter, TaskFilter
 from business.models import File, Task
+from business.save_geojson import get_geo_json
 from business.scheduler import task_execute_at, task_is_exists, remove_task
-from business.save_geojson import transfer_geo_json
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
 from business.threads import ExecuteCommandThread, ExecuteGeojsonThread
 from common.response import PassthroughRenderer
@@ -41,7 +41,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json']
+        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid']
+        #有些zip当中存在其他类型文件（如.grid），需要核实
         my_file = self.request.FILES.get('dataset', None)
         if not my_file:
             return Response(data={'detail': '未检测到文件！'}, status=status.HTTP_400_BAD_REQUEST)
@@ -87,16 +88,21 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                 if (ext != "" or len(ext) != 0) and tmp_name:
                     extract_without_folder(f, every, extract_path)
             zip_file.close()
-        # 启动执行任务线程
-        str_command = 'python D:\\PycharmProjects\\ai-admin-backend\\business\\save_geojson.py --dataset '+file_name+' --save_path '+extract_path+'_geo_json'
-        ExecuteGeojsonThread(file_name, str_command).start()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, extract_path=extract_path)
+        # 生成geojson的json文件
+        get_geo_json(file_name, extract_path+'_geo_json')
+        # 启动执行任务线程，使用json生成folium的html展示页面
+        ExecuteGeojsonThread(extract_path, file_name).start()
+
 
     def perform_destroy(self, instance):
         instance.delete()
         # 删除记录后删除对应文件
         os.remove(instance.file_path)
         shutil.rmtree(instance.extract_path)
+        shutil.rmtree(instance.extract_path+'_geo_json')
+        os.remove(settings.ADMIN_FRONT_HTML_PATH + instance.file_name+ '.html')
+
 
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=False)
@@ -113,13 +119,12 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
     @action(methods=['get'], detail=True)
     def get_gis_view(self, request, *args, **kwargs):
         """
-        根据任务id获取geojson转化的gis图象
+        根据任务id获取geojson转化的gis图象地址
         """
         file = self.get_object()
-        print(file)
-        file_name = file.file_name # wheather pk or exp_id
-        file_gis_path = settings.DATASET_PATH+str(file_name)+'_geo_json'
-        transfer_geo_json(file_gis_path, file_name)
+        # print(file)
+        # file_name = file.file_name # wheather pk or exp_id
+        file_gis_path = str(file) + ".html"
         return file_gis_path
 
 class TaskViewSet(ModelViewSet):
@@ -247,7 +252,7 @@ def file_duplication_handle(original_file_name, ext, path, index):
         tmp_file_name = original_file_name + '(' + str(index) + ')'
         file_path = path + tmp_file_name + ext
         if os.path.isfile(file_path):
-            return file_duplication_handle(original_file_name, ext, path, index + 1)
+            return file_duplication_handle(original_file_name, ext, path, index+1)
         else:
             return file_path
     else:

@@ -203,6 +203,7 @@ MONITORING_FREQUENCY = 1
 # 数据集样例文件
 DATASET_EXAMPLE_PATH = 'D:\\upload\\raw_data\\METR_LA.zip'
 TASK_PARAM_EXAMPLE_PATH = 'D:\\upload\\param\\config.json'
+ADMIN_FRONT_HTML_PATH = "D:/vs_project/ai_front/ai-admin-front/public/"
 # 日志配置
 LOGGING = {
     'version': 1,

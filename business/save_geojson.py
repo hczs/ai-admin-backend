@@ -1,6 +1,4 @@
 import folium
-import json
-import argparse
 import pandas as pd
 import json
 import os
@@ -9,24 +7,29 @@ from django.conf import settings
 
 
 def transfer_geo_json(url, file):
-    antarctic_ice_edge = f"{url}/METR_LA_dyna.json"
-    m = folium.Map(
-        location=[-59.1759, -11.6016],
-        tiles="geo_json",
-        zoom_start=2)
-    folium.GeoJson(antarctic_ice_edge, name="geojson").add_to(m)
+    m = folium.Map(location=[30, -90], tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', zoom_start=1,
+                   attr='default')
+    for json_file in os.listdir(url):
+        geo_layer = f"{url}/{json_file}"
+        folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+        # folium popup 功能测试
+        # folium.Marker(
+        #     location=[47.3489, -124.708],
+        #     popup=folium.Popup(max_width=450).add_child(
+        #         folium.Vega(json.loads(geo_layer), width=450, height=250)
+        #     ),
+        # ).add_to(m)
     folium.LayerControl().add_to(m)
-    geo_view_path = "D:/vs_project/ai_front/ai-admin-front/public/" + str(file) + ".html"
+    geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
     m.save(geo_view_path)
 
 
 class VisHelper:
-    def __init__(self, _config):
+    def __init__(self, dataset, save_path):
 
-        self.config = _config
         self.raw_path = "D:/upload/raw_data/"
-        self.dataset = _config.get("dataset", "")
-        self.save_path = _config.get("save_path", "./visualized_data/")
+        self.dataset = dataset
+        self.save_path = save_path
 
         # get type
         self.config_path = self.raw_path + self.dataset + '/config.json'
@@ -239,14 +242,6 @@ def ensure_dir(dir_path):
         os.makedirs(dir_path)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str,
-                        default='foursquare_tky', help='the name of dataset')
-    parser.add_argument('--save_path', type=str,
-                        default="./visualized_data/", help='the output path of visualization')
-
-    args = parser.parse_args()
-
-    helper = VisHelper(vars(args))
+def get_geo_json(dataset, save_path):
+    helper = VisHelper(dataset, save_path)
     helper.visualize()
