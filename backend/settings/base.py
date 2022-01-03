@@ -13,18 +13,13 @@ from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-=x0^^6q)zc_n2mfn3_l=rc+rui2zwu5^^75plio^7y34+r^5ks'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
 
 # Application definition
 
@@ -77,26 +72,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-# Database
-# https://docs.djangoproject.com/en/3.2/ref/settings/#databases
-
-DATABASES = {
-    # 开发
-    # 'default': {
-    #     'ENGINE': 'django.db.backends.sqlite3',
-    #     'NAME': BASE_DIR / 'db.sqlite3',
-    # }
-    # 测试
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'django',  # 指定的数据库名
-        'USER': 'root',  # 数据库登录的用户名
-        'PASSWORD': 'Boco.123',  # 登录数据库的密码
-        'HOST': '10.12.1.50',
-        # 'HOST': '192.168.3.99',
-        'PORT': '3306',
-    }
-}
 
 # Password validation
 # https://docs.djangoproject.com/en/3.2/ref/settings/#auth-password-validators
@@ -164,19 +139,6 @@ REST_FRAMEWORK = {
     'DATE_FORMAT': '%Y-%m-%d',
 }
 
-# 跨域设置
-# 单个配置
-CORS_ORIGIN_WHITELIST = (
-    'http://127.0.0.1:9528',
-    'http://localhost:9528',
-)
-
-# 允许携带cookie
-CORS_ALLOW_CREDENTIALS = True
-
-# 允许所有主机跨域
-# CORS_ORIGIN_ALLOW_ALL = True
-
 # 登录认证配置
 AUTH_USER_MODEL = 'authentication.Account'
 AUTHENTICATION_BACKENDS = (
@@ -188,19 +150,6 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
 }
 
-# 数据集文件上传路径
-DATASET_PATH = 'D:\\upload\\raw_data\\'
-# 任务参数json文件上传路径
-TASK_PARAM_PATH = 'D:\\upload\\param\\'
-# run_model.py脚本文件位置
-RUN_MODEL_PATH = 'C:\\Users\\Administrator\\Desktop\\flower.py'
-# 监控任务执行的线程，多长时间获取一次任务执行线程的状态（秒）暂时不用
-MONITORING_FREQUENCY = 1
-
-# 样例文件相关
-# 数据集样例文件
-DATASET_EXAMPLE_PATH = 'D:\\upload\\raw_data\\METR_LA.zip'
-TASK_PARAM_EXAMPLE_PATH = 'D:\\upload\\param\\config.json'
 # 日志配置
 LOGGING = {
     'version': 1,
