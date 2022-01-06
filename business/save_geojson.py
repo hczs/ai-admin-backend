@@ -51,7 +51,7 @@ def show_data_statis(url, file):
     file_path = url.replace('_geo_json', '')
     for files in os.listdir(file_path):
         if files.count('dyna') > 0:
-            data = pd.read_csv(settings.DATASET_PATH + file + '\\' + files, index_col='dyna_id')
+            data = pd.read_csv(settings.DATASET_PATH + file + os.sep + files, index_col='dyna_id')
             if 'traffic_flow' in data:
                 min = data.entity_id.min()
                 max = data.entity_id.max()
@@ -110,7 +110,7 @@ def show_data_statis(url, file):
                 form_statis_html(test_dict, 'traffic_intensity', min, max, file)
                 break
         if files.count('grid') > 0:
-            data = pd.read_csv(settings.DATASET_PATH + file + '\\' + files, index_col='dyna_id')
+            data = pd.read_csv(settings.DATASET_PATH + file + '/' + files, index_col='dyna_id')
             # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
             if 'risk' in data:
                 test_dict = {'id': [], 'risk': []}
@@ -166,14 +166,15 @@ def form_long_statis_html(test_dict, asix_y, page_legth, file):
 
 class VisHelper:
     def __init__(self, dataset, save_path):
-
-        self.raw_path = "D:/upload/raw_data/"
+        print(123)
+        self.raw_path = settings.DATASET_PATH
         self.dataset = dataset
         self.save_path = save_path
 
         # get type
         self.config_path = self.raw_path + self.dataset + '/config.json'
         self.data_config = json.load(open(self.config_path, 'r'))
+        print(456)
         if 'dyna' in self.data_config and ['state'] == self.data_config['dyna']['including_types']:
             self.type = 'state'
         elif 'grid' in self.data_config and ['state'] == self.data_config['grid']['including_types']:
@@ -202,7 +203,7 @@ class VisHelper:
         self.geo_reserved_lst = ['type', 'coordinates']
         self.dyna_reserved_lst = ['dyna_id', 'type', 'time', 'entity_id', 'traj_id', 'coordinates']
         self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
-
+        print(789)
     def visualize(self):
         if self.type == 'trajectory':
             # geo
