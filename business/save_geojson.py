@@ -166,7 +166,7 @@ def form_long_statis_html(test_dict, asix_y, page_legth, file):
 
 class VisHelper:
     def __init__(self, dataset, save_path):
-
+        print(123)
         self.raw_path = settings.DATASET_PATH
         self.dataset = dataset
         self.save_path = save_path
@@ -174,6 +174,7 @@ class VisHelper:
         # get type
         self.config_path = self.raw_path + self.dataset + '/config.json'
         self.data_config = json.load(open(self.config_path, 'r'))
+        print(456)
         if 'dyna' in self.data_config and ['state'] == self.data_config['dyna']['including_types']:
             self.type = 'state'
         elif 'grid' in self.data_config and ['state'] == self.data_config['grid']['including_types']:
@@ -202,7 +203,7 @@ class VisHelper:
         self.geo_reserved_lst = ['type', 'coordinates']
         self.dyna_reserved_lst = ['dyna_id', 'type', 'time', 'entity_id', 'traj_id', 'coordinates']
         self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
-
+        print(789)
     def visualize(self):
         if self.type == 'trajectory':
             # geo
