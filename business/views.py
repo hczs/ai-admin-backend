@@ -24,6 +24,7 @@ from business.scheduler import task_execute_at, task_is_exists, remove_task
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
 from business.threads import ExecuteCommandThread, ExecuteGeojsonThread
 from common.response import PassthroughRenderer
+from bs4 import BeautifulSoup
 
 
 class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin, GenericViewSet):
@@ -90,6 +91,12 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
             zip_file.close()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, extract_path=extract_path)
         # 生成geojson的json文件
+        url = settings.ADMIN_FRONT_HTML_PATH+'homepage.html'  # 网页地址
+        soup = BeautifulSoup(open(url, encoding='utf-8'), features='html.parser')
+        content = str.encode(soup.prettify())  # 获取页面内容
+        fp = open(settings.ADMIN_FRONT_HTML_PATH+file_name+".html", "w+b")  # 打开一个文本文件
+        fp.write(content)  # 写入数据
+        fp.close()  # 关闭文件
         get_geo_json(file_name, extract_path+'_geo_json')
         # 启动执行任务线程，使用json生成folium的html展示页面
         ExecuteGeojsonThread(extract_path, file_name).start()

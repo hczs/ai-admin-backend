@@ -2,26 +2,166 @@ import folium
 import pandas as pd
 import json
 import os
-
+import altair as alt
 from django.conf import settings
 
 
 def transfer_geo_json(url, file):
-    m = folium.Map(location=[30, -90], tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', zoom_start=1,
-                   attr='default')
     for json_file in os.listdir(url):
-        geo_layer = f"{url}/{json_file}"
-        folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
-        # folium popup 功能测试
-        # folium.Marker(
-        #     location=[47.3489, -124.708],
-        #     popup=folium.Popup(max_width=450).add_child(
-        #         folium.Vega(json.loads(geo_layer), width=450, height=250)
-        #     ),
-        # ).add_to(m)
-    folium.LayerControl().add_to(m)
-    geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
-    m.save(geo_view_path)
+        if json_file.count('dyna') > 0:
+            show_geo_view(url, json_file, file)
+            print(json_file)
+            print("-#"*55)
+            break
+        elif json_file.count('geo') > 0:
+            show_geo_view(url, json_file, file)
+            break
+        else:
+            show_data_statis(url, file)
+
+def show_geo_view(url, json_file, file):
+    geo_layer = f"{url}/{json_file}"
+    view_json = json.load(open(geo_layer, 'r'))
+    for _ in view_json['features']:
+        if len(_['geometry']['coordinates']) > 0:
+            if type(_['geometry']['coordinates'][0]) is not list:
+                origin_location = _['geometry']['coordinates']
+            else:
+                if type(_['geometry']['coordinates'][0][0]) is not list:
+                    origin_location = _['geometry']['coordinates'][0]
+                else:
+                    origin_location = _['geometry']['coordinates'][0][0]
+            for i in range(1):
+                loc1 = origin_location[0]
+                loc = origin_location[1:]
+                loc.append(loc1)
+            m = folium.Map(location=loc, tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                           zoom_start=12,
+                           attr='default')
+            folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+            folium.LayerControl().add_to(m)
+            geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
+            m.save(geo_view_path)
+        else:
+            show_data_statis(url, file)
+        break
+
+
+def show_data_statis(url, file):
+    file_path = url.replace('_geo_json', '')
+    for files in os.listdir(file_path):
+        if files.count('dyna') > 0:
+            data = pd.read_csv(settings.DATASET_PATH + file + '\\' + files, index_col='dyna_id')
+            if 'traffic_flow' in data:
+                min = data.entity_id.min()
+                max = data.entity_id.max()
+                test_dict = {'id': [], 'abs_flow': []}
+                for i in data.entity_id.unique():
+                    abs_flow = data.traffic_flow[data.entity_id == int(i)].mean()
+                    test_dict['id'].append(i)
+                    test_dict['abs_flow'].append(abs_flow)
+                    pass
+                form_statis_html(test_dict, 'abs_flow', min, max, file)
+                break
+            elif 'in_flow' in data and 'out_flow' in data:
+                min = data.entity_id.min()
+                max = data.entity_id.max()
+                test_dict = {'id': [], 'abs_flow': []}
+                for i in data.entity_id.unique():
+                    inflow = data.in_flow[data.entity_id == int(i)].mean()
+                    outflow = data.out_flow[data.entity_id == int(i)].mean()
+                    test_dict['id'].append(i)
+                    test_dict['abs_flow'].append(inflow - outflow)
+                    pass
+                form_statis_html(test_dict, 'abs_flow', min, max, file)
+                break
+            elif 'inflow' in data and 'outflow' in data:
+                min = data.entity_id.min()
+                max = data.entity_id.max()
+                test_dict = {'id': [], 'abs_flow': []}
+                for i in data.entity_id.unique():
+                    inflow = data.inflow[data.entity_id == int(i)].mean()
+                    outflow = data.outflow[data.entity_id == int(i)].mean()
+                    test_dict['id'].append(i)
+                    test_dict['abs_flow'].append(inflow - outflow)
+                    pass
+                form_statis_html(test_dict, 'abs_flow', min, max, file)
+                break
+            elif 'traffic_speed' in data:
+                min = data.entity_id.min()
+                max = data.entity_id.max()
+                test_dict = {'id': [], 'traffic_speed': []}
+                for i in data.entity_id.unique():
+                    abs_flow = data.traffic_speed[data.entity_id == int(i)].mean()
+                    test_dict['id'].append(i)
+                    test_dict['traffic_speed'].append(abs_flow)
+                    pass
+                form_statis_html(test_dict, 'traffic_speed', min, max, file)
+                break
+            elif 'traffic_intensity' in data:
+                min = data.entity_id.min()
+                max = data.entity_id.max()
+                test_dict = {'id': [], 'traffic_intensity': []}
+                for i in data.entity_id.unique():
+                    abs_flow = data.traffic_intensity[data.entity_id == int(i)].mean()
+                    test_dict['id'].append(i)
+                    test_dict['traffic_intensity'].append(abs_flow)
+                    pass
+                form_statis_html(test_dict, 'traffic_intensity', min, max, file)
+                break
+        if files.count('grid') > 0:
+            data = pd.read_csv(settings.DATASET_PATH + file + '\\' + files, index_col='dyna_id')
+            # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
+            if 'risk' in data:
+                test_dict = {'id': [], 'risk': []}
+                page_legth = 0
+                for i in data.row_id.unique():
+                    for j in data.column_id.unique():
+                        page_legth += 1
+                        risk = data.risk[data.row_id == int(i)][data.column_id == int(j)].mean()
+                        test_dict['id'].append(f"{i}" + f", {j}")
+                        test_dict['risk'].append(risk)
+                form_long_statis_html(test_dict, 'risk', page_legth, file)
+                break
+            elif 'inflow' in data and 'outflow' in data:
+                test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
+                page_legth = 0
+                for i in data.row_id.unique():
+                    for j in data.column_id.unique():
+                        page_legth += 1
+                        inflow = data.inflow[data.row_id == int(i)][data.column_id == int(j)].mean()
+                        outflow = data.outflow[data.row_id == int(i)][data.column_id == int(j)].mean()
+                        test_dict['id'].append(f'{i},' + f'{j}')
+                        test_dict['inflow'].append(inflow)
+                        test_dict['outflow'].append(outflow)
+                        test_dict['abs_flow'].append(inflow - outflow)
+                        pass
+                form_long_statis_html(test_dict, 'abs_flow', page_legth, file)
+                break
+
+
+def form_statis_html(test_dict, asix_y, min, max, file):
+    test_dict_df = pd.DataFrame(test_dict)
+    chart = alt.Chart(test_dict_df).mark_point().encode(
+        x=alt.X('id', scale=alt.Scale(domain=[min, max])),
+        y=asix_y,
+    ).properties(
+        width=1000
+    ).interactive()
+    chart.save(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html")
+
+
+def form_long_statis_html(test_dict, asix_y, page_legth, file):
+    test_dict_df = pd.DataFrame(test_dict)
+    interval = alt.selection_interval()
+    chart = alt.Chart(test_dict_df).mark_point().encode(
+        x='id',
+        y=asix_y,
+    ).properties(
+        selection=interval,
+        width=page_legth * 20
+    )
+    chart.save(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html")
 
 
 class VisHelper:
