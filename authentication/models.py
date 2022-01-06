@@ -36,7 +36,7 @@ class Role(BaseModel):
     角色表
     """
     name = models.CharField('角色名', max_length=20)
-    description = models.CharField('角色描述', max_length=50)
+    description = models.CharField('角色描述', max_length=50, null=True)
     # 角色权限多对多
     permissions = models.ManyToManyField(Permission, blank=True,
                                          verbose_name='功能权限', db_constraint=False)
