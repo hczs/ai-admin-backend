@@ -3,6 +3,12 @@ import math
 
 __all__ = ['pybyte']
 
+import os
+
+import subprocess
+
+from django.http import FileResponse
+
 
 def pybyte(size, dot=2):
     size = float(size)
@@ -52,3 +58,52 @@ def pybyte(size, dot=2):
     else:
         raise ValueError('{}() takes number than or equal to 0, but less than 0 given.'.format(pybyte.__name__))
     return human_size
+
+
+def execute_cmd(cmd):
+    """
+    执行命令行命令
+
+    :param cmd: 命令内容
+    :return: (status, output) status: 1 失败，0 成功
+    """
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    output, err = p.communicate()
+    # 判断命令是否执行成功
+    status = p.returncode
+    if status == 0:
+        print('[SUCCESS] %s' % cmd)
+    else:
+        print('[ERROR] %s' % cmd)
+        return status, err
+    return status, output
+
+
+def read_file_str(file_path):
+    """
+    将一个文件内容读取到字符串中，仅适用于小文件读取，编码格式：utf-8
+    :param file_path: 文件具体路径
+    :return: 文件内容字符串
+    """
+    # 判断路径文件存在
+    if not os.path.isfile(file_path):
+        raise TypeError(file_path + " does not exist")
+    # 读取
+    content = ''
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    return content
+
+
+def generate_download_file(file_path):
+    """
+    通用生成下载文件的方法
+    仅限于下载文件接口，接口方法需要用 @renderer_classes((PassthroughRenderer,))
+
+    :param file_path: 文件路径
+    :return: 响应的response
+    """
+    response_file = FileResponse(open(file_path, 'rb'))
+    response_file['content_type'] = "application/octet-stream"
+    response_file['Content-Disposition'] = 'attachment; filename=' + os.path.basename(file_path)
+    return response_file
