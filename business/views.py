@@ -1,29 +1,37 @@
 import os
 import shutil
+import tempfile
 import time
 import zipfile
 
 from django.conf import settings
+from django.core import serializers
 from django.http import FileResponse
 from django.shortcuts import render
 
 # Create your views here.
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import status, renderers
+from rest_framework import status, renderers, mixins
 from rest_framework.decorators import action, renderer_classes
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin
 from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
+from business.enums import TaskStatusEnum
 from business.filter import FileFilter, TaskFilter
+from business.models import File, Task, TrafficStatePredAndEta, MapMatching, TrajLocPred
 from business.models import File, Task
 from business.save_geojson import get_geo_json
 from business.scheduler import task_execute_at, task_is_exists, remove_task
+from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer, \
+    TrafficStateEtaSerializer, MapMatchingSerializer, TrajLocPredSerializer
+from business.evaluate import evaluate_insert
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
 from business.threads import ExecuteCommandThread, ExecuteGeojsonThread
 from common.response import PassthroughRenderer
+from common.utils import read_file_str, generate_download_file
 from bs4 import BeautifulSoup
 
 
@@ -43,7 +51,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid']
-        #有些zip当中存在其他类型文件（如.grid），需要核实
+        # 有些zip当中存在其他类型文件（如.grid），需要核实
+        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid']
         my_file = self.request.FILES.get('dataset', None)
         if not my_file:
             return Response(data={'detail': '未检测到文件！'}, status=status.HTTP_400_BAD_REQUEST)
@@ -91,25 +100,23 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
             zip_file.close()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, extract_path=extract_path)
         # 生成geojson的json文件
-        url = settings.ADMIN_FRONT_HTML_PATH+'homepage.html'  # 网页地址
+        url = settings.ADMIN_FRONT_HTML_PATH + 'homepage.html'  # 网页地址
         soup = BeautifulSoup(open(url, encoding='utf-8'), features='html.parser')
         content = str.encode(soup.prettify())  # 获取页面内容
-        fp = open(settings.ADMIN_FRONT_HTML_PATH+file_name+".html", "w+b")  # 打开一个文本文件
+        fp = open(settings.ADMIN_FRONT_HTML_PATH + file_name + ".html", "w+b")  # 打开一个文本文件
         fp.write(content)  # 写入数据
         fp.close()  # 关闭文件
-        get_geo_json(file_name, extract_path+'_geo_json')
+        get_geo_json(file_name, extract_path + '_geo_json')
         # 启动执行任务线程，使用json生成folium的html展示页面
         ExecuteGeojsonThread(extract_path, file_name).start()
-
 
     def perform_destroy(self, instance):
         instance.delete()
         # 删除记录后删除对应文件
         os.remove(instance.file_path)
         shutil.rmtree(instance.extract_path)
-        shutil.rmtree(instance.extract_path+'_geo_json')
-        os.remove(settings.ADMIN_FRONT_HTML_PATH + instance.file_name+ '.html')
-
+        shutil.rmtree(instance.extract_path + '_geo_json')
+        os.remove(settings.ADMIN_FRONT_HTML_PATH + instance.file_name + '.html')
 
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=False)
@@ -117,11 +124,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         数据集样例文件下载
         """
-        file_path = settings.DATASET_EXAMPLE_PATH
-        response_file = FileResponse(open(file_path, 'rb'))
-        response_file['content_type'] = "application/octet-stream"
-        response_file['Content-Disposition'] = 'attachment; filename=' + os.path.basename(file_path)
-        return response_file
+        return generate_download_file(settings.DATASET_EXAMPLE_PATH)
 
     @action(methods=['get'], detail=True)
     def get_gis_view(self, request, *args, **kwargs):
@@ -133,6 +136,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         # file_name = file.file_name # wheather pk or exp_id
         file_gis_path = str(file) + ".html"
         return file_gis_path
+
 
 class TaskViewSet(ModelViewSet):
     queryset = Task.objects.all()
@@ -146,6 +150,57 @@ class TaskViewSet(ModelViewSet):
             return TaskSerializer
 
     @action(methods=['get'], detail=True)
+    def get_log(self, *args, **kwargs):
+        """
+        获取指定任务的运行日志
+        1.正在执行（1），尝试读取log文件内容，返回
+        2.执行出错（-1） or 已完成（2），读取executeMsg返回
+        """
+        task = self.get_object()
+        if task.task_status == TaskStatusEnum.IN_PROGRESS.value:
+            file_list = os.listdir(settings.LOG_PATH)
+            log_file = settings.LOG_PATH
+            for file in file_list:
+                if os.path.splitext(file)[0].split('-')[0] == str(task.id):
+                    log_file += file
+                    break
+            if log_file != settings.LOG_PATH:
+                log_content = read_file_str(log_file)
+                return Response(log_content, status=status.HTTP_200_OK)
+            else:
+                return Response(data={'detail': '日志文件不存在！'}, status=status.HTTP_400_BAD_REQUEST)
+        elif task.task_status == TaskStatusEnum.ERROR.value or task.task_status == TaskStatusEnum.COMPLETED.value:
+            return Response(task.execute_msg, status=status.HTTP_200_OK)
+        else:
+            return Response(data={'detail': '任务未开始！'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @renderer_classes((PassthroughRenderer,))
+    @action(methods=['get'], detail=True)
+    def download_log(self, *args, **kwargs):
+        """
+        下载指定任务的日志文件
+        """
+        task = self.get_object()
+        file_list = os.listdir(settings.LOG_PATH)
+        log_file = settings.LOG_PATH
+        for file in file_list:
+            if os.path.splitext(file)[0].split('-')[0] == str(task.id):
+                log_file += file
+                break
+        if log_file == settings.LOG_PATH:
+            # 证明没有对应日志文件，直接生成文件返回
+            file_obj = tempfile.NamedTemporaryFile()
+            file_obj.name = 'error.log'
+            file_obj.write(task.execute_msg.encode('utf-8'))
+            file_obj.seek(0)
+            response_file = FileResponse(file_obj)
+            response_file['content_type'] = "application/octet-stream"
+            response_file['Content-Disposition'] = 'attachment; filename=' + file_obj.name
+            return response_file
+        else:
+            return generate_download_file(log_file)
+
+    @action(methods=['get'], detail=True)
     def execute(self, request, *args, **kwargs):
         """
         执行任务，需要传递execute_time参数为具体执行时间，如果不传参代表立即执行
@@ -153,18 +208,18 @@ class TaskViewSet(ModelViewSet):
         execute_time = request.query_params.get('execute_time')
         task = self.get_object()
         # 检查任务是否可执行
-        if task.task_status != 0:
+        if task.task_status != TaskStatusEnum.NOT_STARTED.value and task.task_status != TaskStatusEnum.ERROR.value:
             return Response(data={'detail': '任务正在执行中或已完成，请勿重复执行！'}, status=status.HTTP_400_BAD_REQUEST)
         # 获取任务数据，组装命令
         task_param = ['task', 'model', 'dataset', 'config_file', 'saved_model', 'train', 'batch_size', 'train_rate',
                       'eval_rate', 'learning_rate', 'max_epoch', 'gpu', 'gpu_id']
-        str_command = 'python ' + settings.RUN_MODEL_PATH + ' --exp_id '+str(task.pk)
+        str_command = 'python ' + settings.RUN_MODEL_PATH + ' --exp_id ' + str(task.pk)
         for param in task_param:
             param_value = getattr(task, param)
-            if param == 'config_file' and param_value is not None:
-                path, param_value = os.path.split(param_value)
-                param_value, file_type = os.path.splitext(param_value)
-            str_command += ' --' + param + ' ' + str(param_value)
+            if param_value is not None:
+                if param == 'config_file':
+                    path, param_value = os.path.split(param_value)
+                str_command += ' --' + param + ' ' + str(param_value)
         # 检查任务是否已经加入过队列中，如果已经存在，把之前的移除，以本次提交为准
         if task_is_exists(str(task.id)):
             remove_task(str(task.id))
@@ -175,6 +230,9 @@ class TaskViewSet(ModelViewSet):
             task.execute_time = execute_time
         else:
             task.execute_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+        # 如果是执行出错重新执行，需要把结束时间置空
+        if task.task_status == TaskStatusEnum.ERROR.value:
+            task.execute_end_time = None
         task.save()
         return Response(status=status.HTTP_200_OK)
 
@@ -230,11 +288,7 @@ class TaskViewSet(ModelViewSet):
         """
         参数配置文件样例文件下载
         """
-        file_path = settings.TASK_PARAM_EXAMPLE_PATH
-        response_file = FileResponse(open(file_path, 'rb'))
-        response_file['content_type'] = "application/octet-stream"
-        response_file['Content-Disposition'] = 'attachment; filename=' + os.path.basename(file_path)
-        return response_file
+        return generate_download_file(settings.TASK_PARAM_EXAMPLE_PATH)
 
     @action(methods=['get'], detail=True)
     def get_result(self, request, *args, **kwargs):
@@ -246,9 +300,56 @@ class TaskViewSet(ModelViewSet):
         # 变更任务状态
         if task.task_status != 2:
             return Response(data={'detail': '任务尚未输出结果'}, status=status.HTTP_400_BAD_REQUEST)
-        file_id = task.pk # wheather pk or exp_id
-        file_path = settings.RESULT_PATH+str(file_id)
+        file_id = task.pk  # wheather pk or exp_id
+        file_path = settings.RESULT_PATH + str(file_id)
         return Response(file_path)
+
+
+class TrafficStateEtaViewSet(ModelViewSet):
+    """
+    交通状态预测任务和到达时间估计任务评价指标查询
+    """
+    queryset = TrafficStatePredAndEta.objects.all()
+    serializer_class = TrafficStateEtaSerializer
+    filterset_fields = ['task']
+
+    @renderer_classes((PassthroughRenderer,))
+    @action(methods=['get'], detail=False)
+    def download(self, request, *args, **kwargs):
+        """
+        指定任务指定指标文件下载
+        """
+        task_id = request.query_params.get('task')
+        # 根据id找到对应指标文件
+        # 数据准备
+        file_dir = settings.EVALUATE_PATH_PREFIX + str(task_id) + settings.EVALUATE_PATH_SUFFIX
+        if os.path.isdir(file_dir):
+            # 扫描文件夹下所有文件
+            file_list = os.listdir(file_dir)
+            for file in file_list:
+                if os.path.splitext(file)[1] == '.csv' or os.path.splitext(file)[1] == '.json':
+                    file_path = file_dir + file
+                    return generate_download_file(file_path)
+        return Response(data={'detail': '指标文件不存在！'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MapMatchingViewSet(ModelViewSet):
+    """
+    路网匹配评价指标
+    """
+    queryset = MapMatching.objects.all()
+    serializer_class = MapMatchingSerializer
+    filterset_fields = ['task']
+
+
+class TrajLocPredViewSet(ModelViewSet):
+    """
+    轨迹下一跳评价指标
+    """
+    queryset = TrajLocPred.objects.all()
+    serializer_class = TrajLocPredSerializer
+    filterset_fields = ['task']
+
 
 def file_duplication_handle(original_file_name, ext, path, index):
     """
@@ -259,7 +360,7 @@ def file_duplication_handle(original_file_name, ext, path, index):
         tmp_file_name = original_file_name + '(' + str(index) + ')'
         file_path = path + tmp_file_name + ext
         if os.path.isfile(file_path):
-            return file_duplication_handle(original_file_name, ext, path, index+1)
+            return file_duplication_handle(original_file_name, ext, path, index + 1)
         else:
             return file_path
     else:

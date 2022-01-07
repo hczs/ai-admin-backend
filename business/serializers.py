@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 import common.utils
-from business.models import File, Task
+from business.models import File, Task, TrafficStatePredAndEta, MapMatching, TrajLocPred
 
 
 class FileSerializer(serializers.ModelSerializer):
@@ -34,4 +34,22 @@ class TaskListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
+        fields = '__all__'
+
+
+class TrafficStateEtaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrafficStatePredAndEta
+        fields = '__all__'
+
+
+class MapMatchingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MapMatching
+        fields = '__all__'
+
+
+class TrajLocPredSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrajLocPred
         fields = '__all__'
