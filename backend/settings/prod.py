@@ -1,3 +1,5 @@
+import os
+
 from .base import *
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -27,14 +29,25 @@ CORS_ORIGIN_WHITELIST = (
 CORS_ALLOW_CREDENTIALS = True
 
 # 允许所有主机跨域
-CORS_ORIGIN_ALLOW_ALL = True
+# CORS_ORIGIN_ALLOW_ALL = True
+
+# libcity库程序相关
+# libcity程序目录
+LIBCITY_PATH = '/root/Bigscity-LibCity'
+# 指标文件目录
+EVALUATE_PATH_PREFIX = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'cache'
+EVALUATE_PATH_SUFFIX = os.sep + 'evaluate_cache' + os.sep
+# run_model.py脚本文件位置
+RUN_MODEL_PATH = 'run_model.py'
+# 激活libcity库虚拟环境命令
+ACTIVE_VENV = 'source /root/Bigscity-LibCity/libcity_venv/bin/activate'
+# libcity的log目录
+LOG_PATH = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'log' + os.sep
 
 # 数据集文件上传路径
-DATASET_PATH = '/usr/local/ai/dataset/'
+DATASET_PATH = LIBCITY_PATH + os.sep + 'raw_data' + os.sep
 # 任务参数json文件上传路径
-TASK_PARAM_PATH = '/usr/local/ai/param/'
-# run_model.py脚本文件位置
-RUN_MODEL_PATH = 'C:\\Users\\Administrator\\Desktop\\flower.py'
+TASK_PARAM_PATH = LIBCITY_PATH + os.sep
 
 # 样例文件相关
 # 数据集样例文件
