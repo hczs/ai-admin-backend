@@ -1,3 +1,5 @@
+import os
+
 from .base import *
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -27,12 +29,23 @@ CORS_ORIGIN_WHITELIST = (
 # 允许携带cookie
 CORS_ALLOW_CREDENTIALS = True
 
-# 数据集文件上传路径
-DATASET_PATH = 'D:\\upload\\raw_data\\'
-# 任务参数json文件上传路径
-TASK_PARAM_PATH = 'D:\\upload\\param\\'
+# libcity库程序相关
+# libcity程序目录
+LIBCITY_PATH = 'E:\\工作内容\\python\\项目\\Bigscity-LibCity-master\\Bigscity-LibCity-master'
+# 指标文件目录
+EVALUATE_PATH_PREFIX = LIBCITY_PATH + os.sep + 'libcity\\cache\\'
+EVALUATE_PATH_SUFFIX = '\\evaluate_cache\\'
 # run_model.py脚本文件位置
-RUN_MODEL_PATH = 'C:\\Users\\Administrator\\Desktop\\flower.py'
+RUN_MODEL_PATH = 'run_model.py'
+# 激活libcity库虚拟环境命令
+ACTIVE_VENV = 'E:\\工作内容\\python\\项目\\Bigscity-LibCity-master\\Bigscity-LibCity-master\\venv\\Scripts\\activate.bat'
+# libcity的log目录
+LOG_PATH = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'log' + os.sep
+
+# 数据集文件上传路径
+DATASET_PATH = LIBCITY_PATH + os.sep + 'raw_data\\'
+# 任务参数json文件上传路径
+TASK_PARAM_PATH = LIBCITY_PATH + os.sep
 
 # 样例文件相关
 # 数据集样例文件
