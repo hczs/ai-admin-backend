@@ -51,5 +51,5 @@ TASK_PARAM_PATH = LIBCITY_PATH + os.sep
 # 数据集样例文件
 DATASET_EXAMPLE_PATH = 'D:\\upload\\raw_data\\METR_LA.zip'
 TASK_PARAM_EXAMPLE_PATH = 'D:\\upload\\param\\config.json'
-ADMIN_FRONT_HTML_PATH = "D:/vs_project/ai_front/ai-admin-front/public/"
+ADMIN_FRONT_HTML_PATH = "D:\\vscodework\\vue-admin-template-permission-control\\public\\"
 # ADMIN_FRONT_HTML_PATH = "/usr/local/nginx/html/ai-admin/dist/"
