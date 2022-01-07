@@ -4,9 +4,9 @@ import time
 
 from django.conf import settings
 
-from business.enums import TaskStatusEnum
+from business.enums import TaskStatusEnum, DatasetStatusEnum
 from business.evaluate import evaluate_insert
-from business.models import Task
+from business.models import Task, File
 from common.utils import execute_cmd
 from business.save_geojson import transfer_geo_json, get_geo_json
 
@@ -67,4 +67,12 @@ class ExecuteGeojsonThread(threading.Thread):
         super(ExecuteGeojsonThread, self).__init__(name=thread_name)
 
     def run(self):
+        get_geo_json(self.file_name, self.extract_path + '_geo_json')
+        print(self.file_name, 'geojson生成完毕')
         transfer_geo_json(self.extract_path + '_geo_json', self.file_name)
+        print(self.file_name, "html生成完毕")
+        # 处理完毕，更新数据集状态
+        file_obj = File.objects.get(file_name=self.file_name)
+        file_obj.dataset_status = DatasetStatusEnum.PROCESSING_COMPLETE.value
+        file_obj.save()
+
