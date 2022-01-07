@@ -20,3 +20,11 @@ class TaskStatusEnum(Enum):
     IN_PROGRESS = 1
     COMPLETED = 2
     ERROR = -1
+
+
+class DatasetStatusEnum(Enum):
+    """
+    数据集状态枚举类
+    """
+    PROCESSING = 0
+    PROCESSING_COMPLETE = 1

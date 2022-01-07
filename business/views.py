@@ -19,7 +19,7 @@ from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
-from business.enums import TaskStatusEnum
+from business.enums import TaskStatusEnum, DatasetStatusEnum
 from business.filter import FileFilter, TaskFilter
 from business.models import File, Task, TrafficStatePredAndEta, MapMatching, TrajLocPred
 from business.models import File, Task
@@ -50,7 +50,6 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid']
         # 有些zip当中存在其他类型文件（如.grid），需要核实
         atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid']
         my_file = self.request.FILES.get('dataset', None)
@@ -98,7 +97,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                 if (ext != "" or len(ext) != 0) and tmp_name:
                     extract_without_folder(f, every, extract_path)
             zip_file.close()
-        serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, extract_path=extract_path)
+        serializer.save(file_name=file_name, file_path=file_path, file_size=file_size,
+                        extract_path=extract_path, dataset_status=DatasetStatusEnum.PROCESSING.value)
         # 生成geojson的json文件
         url = settings.ADMIN_FRONT_HTML_PATH + 'homepage.html'  # 网页地址
         soup = BeautifulSoup(open(url, encoding='utf-8'), features='html.parser')
@@ -106,7 +106,6 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         fp = open(settings.ADMIN_FRONT_HTML_PATH + file_name + ".html", "w+b")  # 打开一个文本文件
         fp.write(content)  # 写入数据
         fp.close()  # 关闭文件
-        get_geo_json(file_name, extract_path + '_geo_json')
         # 启动执行任务线程，使用json生成folium的html展示页面
         ExecuteGeojsonThread(extract_path, file_name).start()
 
