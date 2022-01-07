@@ -8,12 +8,14 @@ from business.enums import TaskStatusEnum
 from business.evaluate import evaluate_insert
 from business.models import Task
 from common.utils import execute_cmd
+from business.save_geojson import transfer_geo_json, get_geo_json
 
 
 class ExecuteCommandThread(threading.Thread):
     """
     执行命令行命令线程，执行传入的命令str_command
     """
+
     def __init__(self, thread_name, str_command):
         self.str_command = str_command
         super(ExecuteCommandThread, self).__init__(name=thread_name)
@@ -49,3 +51,20 @@ class ExecuteCommandThread(threading.Thread):
         # 返回原工作目录
         os.chdir(backup_dir)
         print('执行结束，切回原来的：', os.getcwd())
+        # 把自己加到监控线程中
+        # MonitorThread(self.name, self.name + '-MonitorThread').start()
+
+
+class ExecuteGeojsonThread(threading.Thread):
+    """
+    执行命令行命令线程，执行传入的命令str_command
+    """
+
+    def __init__(self, extract_path, thread_name):
+        # self.str_command = str_command
+        self.file_name = thread_name
+        self.extract_path = extract_path
+        super(ExecuteGeojsonThread, self).__init__(name=thread_name)
+
+    def run(self):
+        transfer_geo_json(self.extract_path + '_geo_json', self.file_name)

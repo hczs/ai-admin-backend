@@ -22,12 +22,17 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from business.enums import TaskStatusEnum
 from business.filter import FileFilter, TaskFilter
 from business.models import File, Task, TrafficStatePredAndEta, MapMatching, TrajLocPred
+from business.models import File, Task
+from business.save_geojson import get_geo_json
 from business.scheduler import task_execute_at, task_is_exists, remove_task
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer, \
     TrafficStateEtaSerializer, MapMatchingSerializer, TrajLocPredSerializer
 from business.evaluate import evaluate_insert
+from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
+from business.threads import ExecuteCommandThread, ExecuteGeojsonThread
 from common.response import PassthroughRenderer
 from common.utils import read_file_str, generate_download_file
+from bs4 import BeautifulSoup
 
 
 class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin, GenericViewSet):
@@ -45,6 +50,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid']
+        #有些zip当中存在其他类型文件（如.grid），需要核实
         atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid']
         my_file = self.request.FILES.get('dataset', None)
         if not my_file:
@@ -92,12 +99,26 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                     extract_without_folder(f, every, extract_path)
             zip_file.close()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, extract_path=extract_path)
+        # 生成geojson的json文件
+        url = settings.ADMIN_FRONT_HTML_PATH+'homepage.html'  # 网页地址
+        soup = BeautifulSoup(open(url, encoding='utf-8'), features='html.parser')
+        content = str.encode(soup.prettify())  # 获取页面内容
+        fp = open(settings.ADMIN_FRONT_HTML_PATH+file_name+".html", "w+b")  # 打开一个文本文件
+        fp.write(content)  # 写入数据
+        fp.close()  # 关闭文件
+        get_geo_json(file_name, extract_path+'_geo_json')
+        # 启动执行任务线程，使用json生成folium的html展示页面
+        ExecuteGeojsonThread(extract_path, file_name).start()
+
 
     def perform_destroy(self, instance):
         instance.delete()
         # 删除记录后删除对应文件
         os.remove(instance.file_path)
         shutil.rmtree(instance.extract_path)
+        shutil.rmtree(instance.extract_path+'_geo_json')
+        os.remove(settings.ADMIN_FRONT_HTML_PATH + instance.file_name+ '.html')
+
 
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=False)
@@ -107,6 +128,16 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         return generate_download_file(settings.DATASET_EXAMPLE_PATH)
 
+    @action(methods=['get'], detail=True)
+    def get_gis_view(self, request, *args, **kwargs):
+        """
+        根据任务id获取geojson转化的gis图象地址
+        """
+        file = self.get_object()
+        # print(file)
+        # file_name = file.file_name # wheather pk or exp_id
+        file_gis_path = str(file) + ".html"
+        return file_gis_path
 
 class TaskViewSet(ModelViewSet):
     queryset = Task.objects.all()
@@ -183,7 +214,7 @@ class TaskViewSet(ModelViewSet):
         # 获取任务数据，组装命令
         task_param = ['task', 'model', 'dataset', 'config_file', 'saved_model', 'train', 'batch_size', 'train_rate',
                       'eval_rate', 'learning_rate', 'max_epoch', 'gpu', 'gpu_id']
-        str_command = 'python ' + settings.RUN_MODEL_PATH
+        str_command = 'python ' + settings.RUN_MODEL_PATH + ' --exp_id '+str(task.pk)
         for param in task_param:
             param_value = getattr(task, param)
             if param_value is not None:
@@ -191,6 +222,10 @@ class TaskViewSet(ModelViewSet):
                     path, param_value = os.path.split(param_value)
                 str_command += ' --' + param + ' ' + str(param_value)
         str_command += ' --exp_id' + ' ' + str(task.id)  # 指定任务id
+            if param == 'config_file' and param_value is not None:
+                path, param_value = os.path.split(param_value)
+                param_value, file_type = os.path.splitext(param_value)
+            str_command += ' --' + param + ' ' + str(param_value)
         # 检查任务是否已经加入过队列中，如果已经存在，把之前的移除，以本次提交为准
         if task_is_exists(str(task.id)):
             remove_task(str(task.id))
@@ -246,6 +281,13 @@ class TaskViewSet(ModelViewSet):
         # 返回文件存储路径
         return Response(file_path)
 
+    def perform_create(self, serializer):
+        """
+        创建任务时添加任务创建者
+        """
+        account = self.request.user
+        serializer.save(creator=account)
+
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=False)
     def download_config(self, request):
@@ -254,13 +296,19 @@ class TaskViewSet(ModelViewSet):
         """
         return generate_download_file(settings.TASK_PARAM_EXAMPLE_PATH)
 
-    def perform_create(self, serializer):
+    @action(methods=['get'], detail=True)
+    def get_result(self, request, *args, **kwargs):
         """
-        创建任务时添加任务创建者
+        根据任务id获取结果
         """
-        account = self.request.user
-        serializer.save(creator=account)
-
+        task = self.get_object()
+        print(task)
+        # 变更任务状态
+        if task.task_status != 2:
+            return Response(data={'detail': '任务尚未输出结果'}, status=status.HTTP_400_BAD_REQUEST)
+        file_id = task.pk # wheather pk or exp_id
+        file_path = settings.RESULT_PATH+str(file_id)
+        return Response(file_path)
 
 class TrafficStateEtaViewSet(ModelViewSet):
     """
@@ -317,7 +365,7 @@ def file_duplication_handle(original_file_name, ext, path, index):
         tmp_file_name = original_file_name + '(' + str(index) + ')'
         file_path = path + tmp_file_name + ext
         if os.path.isfile(file_path):
-            return file_duplication_handle(original_file_name, ext, path, index + 1)
+            return file_duplication_handle(original_file_name, ext, path, index+1)
         else:
             return file_path
     else:

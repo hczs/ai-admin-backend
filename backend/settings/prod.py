@@ -40,3 +40,4 @@ RUN_MODEL_PATH = 'C:\\Users\\Administrator\\Desktop\\flower.py'
 # 数据集样例文件
 DATASET_EXAMPLE_PATH = '/usr/local/ai/sample/METR_LA.zip'
 TASK_PARAM_EXAMPLE_PATH = '/usr/local/ai/sample/config.json'
+ADMIN_FRONT_HTML_PATH = "/usr/local/nginx/html/ai-admin/dist/"
