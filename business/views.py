@@ -110,12 +110,16 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         ExecuteGeojsonThread(extract_path, file_name).start()
 
     def perform_destroy(self, instance):
+        # 删除记录先删除对应文件
+        if os.path.isfile(instance.file_path):
+            os.remove(instance.file_path)
+        if os.path.isdir(instance.extract_path):
+            shutil.rmtree(instance.extract_path)
+        if os.path.isdir(instance.extract_path + '_geo_json'):
+            shutil.rmtree(instance.extract_path + '_geo_json')
+        if os.path.isfile(settings.ADMIN_FRONT_HTML_PATH + instance.file_name + '.html'):
+            os.remove(settings.ADMIN_FRONT_HTML_PATH + instance.file_name + '.html')
         instance.delete()
-        # 删除记录后删除对应文件
-        os.remove(instance.file_path)
-        shutil.rmtree(instance.extract_path)
-        shutil.rmtree(instance.extract_path + '_geo_json')
-        os.remove(settings.ADMIN_FRONT_HTML_PATH + instance.file_name + '.html')
 
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=False)

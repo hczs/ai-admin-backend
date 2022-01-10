@@ -8,6 +8,7 @@ import os
 import subprocess
 
 from django.http import FileResponse
+from loguru import logger
 
 
 def pybyte(size, dot=2):
@@ -72,9 +73,9 @@ def execute_cmd(cmd):
     # 判断命令是否执行成功
     status = p.returncode
     if status == 0:
-        print('[SUCCESS] %s' % cmd)
+        logger.info('[SUCCESS] %s' % cmd)
     else:
-        print('[ERROR] %s' % cmd)
+        logger.error('[ERROR] command: %s; message: %s' % (cmd, err))
         return status, err
     return status, output
 
