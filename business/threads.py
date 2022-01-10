@@ -33,7 +33,6 @@ class ExecuteCommandThread(threading.Thread):
         # 变更任务状态
         task.task_status = TaskStatusEnum.IN_PROGRESS.value
         task.save()
-        print(self.str_command)
         # 执行
         self.str_command = settings.ACTIVE_VENV + ' && ' + self.str_command
         logger.info('execute command: ' + self.str_command)
