@@ -6,6 +6,7 @@ import altair as alt
 from django.conf import settings
 from business.enums import DatasetStatusEnum
 
+
 def transfer_geo_json(url, file):
     for json_file in os.listdir(url):
         if json_file.count('dyna') > 0:
@@ -236,7 +237,7 @@ class VisHelper:
         self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
 
     def visualize(self):
-        file_form_status = 0
+        file_form_status = DatasetStatusEnum.ERROR.value
         try:
             if self.type == 'trajectory':
                 # geo
@@ -246,19 +247,17 @@ class VisHelper:
                 for dyna_file in self.dyna_file:
                     self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
                     self._visualize_dyna()
-                file_form_status = 1
             elif self.type == 'state':
                 self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
                 for dyna_file in self.dyna_file:
                     self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
                     self._visualize_state()
-                file_form_status = 1
             elif self.type == 'grid':
                 self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
                 for grid_file in self.grid_file:
                     self.grid_path = self.raw_path + self.dataset + '/' + grid_file
                     self._visualize_grid()
-                file_form_status = 1
+            file_form_status = DatasetStatusEnum.PROCESSING_COMPLETE.value
             return file_form_status
         except:
             return file_form_status
@@ -427,5 +426,5 @@ def get_geo_json(dataset, save_path):
         helper = VisHelper(dataset, save_path)
         file_form_status = helper.visualize()
     except:
-        file_form_status = 0
+        file_form_status = DatasetStatusEnum.ERROR.value
     return file_form_status
