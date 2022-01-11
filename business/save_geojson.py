@@ -4,20 +4,22 @@ import json
 import os
 import altair as alt
 from django.conf import settings
-
+from business.enums import DatasetStatusEnum
 
 def transfer_geo_json(url, file):
     for json_file in os.listdir(url):
         if json_file.count('dyna') > 0:
-            show_geo_view(url, json_file, file)
+            file_view_status = show_geo_view(url, json_file, file)
             print(json_file)
-            print("-#"*55)
-            break
+            print("-#" * 55)
+            return file_view_status
         elif json_file.count('geo') > 0:
-            show_geo_view(url, json_file, file)
-            break
+            file_view_status = show_geo_view(url, json_file, file)
+            return file_view_status
         else:
-            show_data_statis(url, file)
+            file_view_status = show_data_statis(url, file)
+            return file_view_status
+
 
 def show_geo_view(url, json_file, file):
     geo_layer = f"{url}/{json_file}"
@@ -31,20 +33,23 @@ def show_geo_view(url, json_file, file):
                     origin_location = _['geometry']['coordinates'][0]
                 else:
                     origin_location = _['geometry']['coordinates'][0][0]
-            for i in range(1):
+            try:
                 loc1 = origin_location[0]
                 loc = origin_location[1:]
                 loc.append(loc1)
-            m = folium.Map(location=loc, tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                           zoom_start=12,
-                           attr='default')
-            folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
-            folium.LayerControl().add_to(m)
-            geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
-            m.save(geo_view_path)
+                m = folium.Map(location=loc, tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                               zoom_start=12,
+                               attr='default')
+                folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+                folium.LayerControl().add_to(m)
+                geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
+                m.save(geo_view_path)
+                file_view_status = DatasetStatusEnum.SUCCESS.value
+            except:
+                file_view_status = DatasetStatusEnum.ERROR.value
         else:
-            show_data_statis(url, file)
-        break
+            file_view_status = show_data_statis(url, file)
+        return file_view_status
 
 
 def show_data_statis(url, file):
@@ -53,91 +58,119 @@ def show_data_statis(url, file):
         if files.count('dyna') > 0:
             data = pd.read_csv(settings.DATASET_PATH + file + os.sep + files, index_col='dyna_id')
             if 'traffic_flow' in data:
-                min = data.entity_id.min()
-                max = data.entity_id.max()
-                test_dict = {'id': [], 'abs_flow': []}
-                for i in data.entity_id.unique():
-                    abs_flow = data.traffic_flow[data.entity_id == int(i)].mean()
-                    test_dict['id'].append(i)
-                    test_dict['abs_flow'].append(abs_flow)
-                    pass
-                form_statis_html(test_dict, 'abs_flow', min, max, file)
-                break
+                try:
+                    min = data.entity_id.min()
+                    max = data.entity_id.max()
+                    test_dict = {'id': [], 'abs_flow': []}
+                    for i in data.entity_id.unique():
+                        abs_flow = data.traffic_flow[data.entity_id == int(i)].mean()
+                        test_dict['id'].append(i)
+                        test_dict['abs_flow'].append(abs_flow)
+                        pass
+                    form_statis_html(test_dict, 'abs_flow', min, max, file)
+                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                except:
+                    file_view_status = DatasetStatusEnum.ERROR.value
+                return file_view_status
             elif 'in_flow' in data and 'out_flow' in data:
-                min = data.entity_id.min()
-                max = data.entity_id.max()
-                test_dict = {'id': [], 'abs_flow': []}
-                for i in data.entity_id.unique():
-                    inflow = data.in_flow[data.entity_id == int(i)].mean()
-                    outflow = data.out_flow[data.entity_id == int(i)].mean()
-                    test_dict['id'].append(i)
-                    test_dict['abs_flow'].append(inflow - outflow)
-                    pass
-                form_statis_html(test_dict, 'abs_flow', min, max, file)
-                break
+                try:
+                    min = data.entity_id.min()
+                    max = data.entity_id.max()
+                    test_dict = {'id': [], 'abs_flow': []}
+                    for i in data.entity_id.unique():
+                        inflow = data.in_flow[data.entity_id == int(i)].mean()
+                        outflow = data.out_flow[data.entity_id == int(i)].mean()
+                        test_dict['id'].append(i)
+                        test_dict['abs_flow'].append(inflow - outflow)
+                        pass
+                    form_statis_html(test_dict, 'abs_flow', min, max, file)
+                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                except:
+                    file_view_status = DatasetStatusEnum.ERROR.value
+                return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                min = data.entity_id.min()
-                max = data.entity_id.max()
-                test_dict = {'id': [], 'abs_flow': []}
-                for i in data.entity_id.unique():
-                    inflow = data.inflow[data.entity_id == int(i)].mean()
-                    outflow = data.outflow[data.entity_id == int(i)].mean()
-                    test_dict['id'].append(i)
-                    test_dict['abs_flow'].append(inflow - outflow)
-                    pass
-                form_statis_html(test_dict, 'abs_flow', min, max, file)
-                break
+                try:
+                    min = data.entity_id.min()
+                    max = data.entity_id.max()
+                    test_dict = {'id': [], 'abs_flow': []}
+                    for i in data.entity_id.unique():
+                        inflow = data.inflow[data.entity_id == int(i)].mean()
+                        outflow = data.outflow[data.entity_id == int(i)].mean()
+                        test_dict['id'].append(i)
+                        test_dict['abs_flow'].append(inflow - outflow)
+                        pass
+                    form_statis_html(test_dict, 'abs_flow', min, max, file)
+                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                except:
+                    file_view_status = DatasetStatusEnum.ERROR.value
+                return file_view_status
             elif 'traffic_speed' in data:
-                min = data.entity_id.min()
-                max = data.entity_id.max()
-                test_dict = {'id': [], 'traffic_speed': []}
-                for i in data.entity_id.unique():
-                    abs_flow = data.traffic_speed[data.entity_id == int(i)].mean()
-                    test_dict['id'].append(i)
-                    test_dict['traffic_speed'].append(abs_flow)
-                    pass
-                form_statis_html(test_dict, 'traffic_speed', min, max, file)
-                break
+                try:
+                    min = data.entity_id.min()
+                    max = data.entity_id.max()
+                    test_dict = {'id': [], 'traffic_speed': []}
+                    for i in data.entity_id.unique():
+                        abs_flow = data.traffic_speed[data.entity_id == int(i)].mean()
+                        test_dict['id'].append(i)
+                        test_dict['traffic_speed'].append(abs_flow)
+                        pass
+                    form_statis_html(test_dict, 'traffic_speed', min, max, file)
+                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                except:
+                    file_view_status = DatasetStatusEnum.ERROR.value
+                return file_view_status
             elif 'traffic_intensity' in data:
-                min = data.entity_id.min()
-                max = data.entity_id.max()
-                test_dict = {'id': [], 'traffic_intensity': []}
-                for i in data.entity_id.unique():
-                    abs_flow = data.traffic_intensity[data.entity_id == int(i)].mean()
-                    test_dict['id'].append(i)
-                    test_dict['traffic_intensity'].append(abs_flow)
-                    pass
-                form_statis_html(test_dict, 'traffic_intensity', min, max, file)
-                break
+                try:
+                    min = data.entity_id.min()
+                    max = data.entity_id.max()
+                    test_dict = {'id': [], 'traffic_intensity': []}
+                    for i in data.entity_id.unique():
+                        abs_flow = data.traffic_intensity[data.entity_id == int(i)].mean()
+                        test_dict['id'].append(i)
+                        test_dict['traffic_intensity'].append(abs_flow)
+                        pass
+                    form_statis_html(test_dict, 'traffic_intensity', min, max, file)
+                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                except:
+                    file_view_status = DatasetStatusEnum.ERROR.value
+                return file_view_status
         if files.count('grid') > 0:
             data = pd.read_csv(settings.DATASET_PATH + file + '/' + files, index_col='dyna_id')
             # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
             if 'risk' in data:
-                test_dict = {'id': [], 'risk': []}
-                page_legth = 0
-                for i in data.row_id.unique():
-                    for j in data.column_id.unique():
-                        page_legth += 1
-                        risk = data.risk[data.row_id == int(i)][data.column_id == int(j)].mean()
-                        test_dict['id'].append(f"{i}" + f", {j}")
-                        test_dict['risk'].append(risk)
-                form_long_statis_html(test_dict, 'risk', page_legth, file)
-                break
+                try:
+                    test_dict = {'id': [], 'risk': []}
+                    page_legth = 0
+                    for i in data.row_id.unique():
+                        for j in data.column_id.unique():
+                            page_legth += 1
+                            risk = data.risk[data.row_id == int(i)][data.column_id == int(j)].mean()
+                            test_dict['id'].append(f"{i}" + f", {j}")
+                            test_dict['risk'].append(risk)
+                    form_long_statis_html(test_dict, 'risk', page_legth, file)
+                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                except:
+                    file_view_status = DatasetStatusEnum.ERROR.value
+                return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
-                page_legth = 0
-                for i in data.row_id.unique():
-                    for j in data.column_id.unique():
-                        page_legth += 1
-                        inflow = data.inflow[data.row_id == int(i)][data.column_id == int(j)].mean()
-                        outflow = data.outflow[data.row_id == int(i)][data.column_id == int(j)].mean()
-                        test_dict['id'].append(f'{i},' + f'{j}')
-                        test_dict['inflow'].append(inflow)
-                        test_dict['outflow'].append(outflow)
-                        test_dict['abs_flow'].append(inflow - outflow)
-                        pass
-                form_long_statis_html(test_dict, 'abs_flow', page_legth, file)
-                break
+                try:
+                    test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
+                    page_legth = 0
+                    for i in data.row_id.unique():
+                        for j in data.column_id.unique():
+                            page_legth += 1
+                            inflow = data.inflow[data.row_id == int(i)][data.column_id == int(j)].mean()
+                            outflow = data.outflow[data.row_id == int(i)][data.column_id == int(j)].mean()
+                            test_dict['id'].append(f'{i},' + f'{j}')
+                            test_dict['inflow'].append(inflow)
+                            test_dict['outflow'].append(outflow)
+                            test_dict['abs_flow'].append(inflow - outflow)
+                            pass
+                    form_long_statis_html(test_dict, 'abs_flow', page_legth, file)
+                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                except:
+                    file_view_status = DatasetStatusEnum.ERROR.value
+                return file_view_status
 
 
 def form_statis_html(test_dict, asix_y, min, max, file):
@@ -203,26 +236,33 @@ class VisHelper:
         self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
 
     def visualize(self):
-        if self.type == 'trajectory':
-            # geo
-            self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
-            self._visualize_geo()
+        file_form_status = 0
+        try:
+            if self.type == 'trajectory':
+                # geo
+                self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
+                self._visualize_geo()
+                # dyna
+                for dyna_file in self.dyna_file:
+                    self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
+                    self._visualize_dyna()
+                file_form_status = 1
+            elif self.type == 'state':
+                self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
+                for dyna_file in self.dyna_file:
+                    self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
+                    self._visualize_state()
+                file_form_status = 1
+            elif self.type == 'grid':
+                self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
+                for grid_file in self.grid_file:
+                    self.grid_path = self.raw_path + self.dataset + '/' + grid_file
+                    self._visualize_grid()
+                file_form_status = 1
+            return file_form_status
+        except:
+            return file_form_status
 
-            # dyna
-            for dyna_file in self.dyna_file:
-                self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
-                self._visualize_dyna()
-
-        elif self.type == 'state':
-            self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
-            for dyna_file in self.dyna_file:
-                self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
-                self._visualize_state()
-        elif self.type == 'grid':
-            self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
-            for grid_file in self.grid_file:
-                self.grid_path = self.raw_path + self.dataset + '/' + grid_file
-                self._visualize_grid()
 
     def _visualize_state(self):
         geo_file = pd.read_csv(self.geo_path, index_col=None)
@@ -312,6 +352,7 @@ class VisHelper:
 
     def _visualize_dyna(self):
         dyna_file = pd.read_csv(self.dyna_path, index_col=None)
+
         dyna_feature_lst = [_ for _ in list(dyna_file.columns) if _ not in self.dyna_reserved_lst]
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         trajectory = {}
@@ -382,5 +423,9 @@ def ensure_dir(dir_path):
 
 
 def get_geo_json(dataset, save_path):
-    helper = VisHelper(dataset, save_path)
-    helper.visualize()
+    try:
+        helper = VisHelper(dataset, save_path)
+        file_form_status = helper.visualize()
+    except:
+        file_form_status = 0
+    return file_form_status

@@ -28,3 +28,5 @@ class DatasetStatusEnum(Enum):
     """
     PROCESSING = 0
     PROCESSING_COMPLETE = 1
+    ERROR = -1
+    SUCCESS = 2
