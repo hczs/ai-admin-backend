@@ -27,4 +27,6 @@ class DatasetStatusEnum(Enum):
     数据集状态枚举类
     """
     PROCESSING = 0
-    PROCESSING_COMPLETE = 1
+    PROCESSING_COMPLETE = 1  # 用来表示完成geojson文件生成
+    ERROR = -1
+    SUCCESS = 2  # 用来表示完成html文件生成

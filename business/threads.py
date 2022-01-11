@@ -66,12 +66,13 @@ class ExecuteGeojsonThread(threading.Thread):
         super(ExecuteGeojsonThread, self).__init__(name=thread_name)
 
     def run(self):
-        get_geo_json(self.file_name, self.extract_path + '_geo_json')
-        logger.info(self.file_name + 'geojson文件生成完毕')
-        transfer_geo_json(self.extract_path + '_geo_json', self.file_name)
-        logger.info(self.file_name + "html文件生成完毕")
-        # 处理完毕，更新数据集状态
+        file_view_status = DatasetStatusEnum.ERROR.value
         file_obj = File.objects.get(file_name=self.file_name)
-        file_obj.dataset_status = DatasetStatusEnum.PROCESSING_COMPLETE.value
+        file_form_status = get_geo_json(self.file_name, self.extract_path + '_geo_json')
+        if file_form_status == DatasetStatusEnum.PROCESSING_COMPLETE.value:
+            logger.info(self.file_name + 'geojson文件生成完毕')
+            file_view_status = transfer_geo_json(self.extract_path + '_geo_json', self.file_name)
+            logger.info(self.file_name + "数据可视化处理完毕")
+        # 处理完毕，更新数据集状态
+        file_obj.dataset_status = file_view_status
         file_obj.save()
-
