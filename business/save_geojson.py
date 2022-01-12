@@ -5,6 +5,7 @@ import os
 import altair as alt
 from django.conf import settings
 from business.enums import DatasetStatusEnum
+from loguru import logger
 
 
 def transfer_geo_json(url, file):
