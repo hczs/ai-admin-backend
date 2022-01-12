@@ -35,7 +35,7 @@ class Role(BaseModel):
     """
     角色表
     """
-    name = models.CharField('角色名', max_length=20)
+    name = models.CharField('角色名', max_length=20, unique=True)
     description = models.CharField('角色描述', max_length=50, null=True)
     # 角色权限多对多
     permissions = models.ManyToManyField(Permission, blank=True,
@@ -55,8 +55,8 @@ class Account(AbstractBaseUser, BaseModel):
     账号表
     """
     account_number = models.CharField('账号', max_length=20, unique=True)
-    password = models.CharField('密码', max_length=128)
-    # 账户权限多对多
+    password = models.CharField('密码', max_length=128, null=True)
+    # 账户角色多对多
     roles = models.ManyToManyField(Role, blank=True, verbose_name='角色', db_constraint=False)
 
     USERNAME_FIELD = 'account_number'

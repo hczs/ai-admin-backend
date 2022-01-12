@@ -8,6 +8,7 @@ import os
 import subprocess
 
 from django.http import FileResponse
+import random
 from loguru import logger
 
 
@@ -108,3 +109,14 @@ def generate_download_file(file_path):
     response_file['content_type'] = "application/octet-stream"
     response_file['Content-Disposition'] = 'attachment; filename=' + os.path.basename(file_path)
     return response_file
+
+
+def get_code():
+    """
+    随机生成六位字符串
+    """
+    code = ''
+    for _ in range(6):
+        add = random.choice([random.randrange(10), chr(random.randrange(65, 91)), chr(random.randrange(97, 123))])
+        code += str(add)
+    return code

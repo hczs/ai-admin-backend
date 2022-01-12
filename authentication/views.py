@@ -1,6 +1,7 @@
 from django.contrib.auth.hashers import make_password, check_password
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+from loguru import logger
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -14,6 +15,7 @@ from authentication.permission import get_permission_list
 from authentication.serializers import AccountSerializer, RoleSerializer, PermissionSerializer, AccountSelectSerializer, \
     AccountListSerializer, PermissionCreateSerializer
 from authentication.utils import get_tree
+from common.utils import get_code
 
 
 class AccountViewSet(ModelViewSet):
@@ -28,17 +30,30 @@ class AccountViewSet(ModelViewSet):
             return AccountSelectSerializer
         return AccountSerializer
 
+    @action(methods=['post'], detail=False)
+    def exists(self, request):
+        """
+        检测账号是否存在
+        """
+        account_number = request.data.get('account_number')
+        accounts = Account.objects.filter(account_number=account_number).all()
+        if len(accounts) == 0:
+            return Response(status=status.HTTP_200_OK)
+        else:
+            return Response(data={'msg': '角色已存在！', 'id': accounts[0].id}, status=status.HTTP_400_BAD_REQUEST)
+
     def create(self, request, *args, **kwargs):
         """
         创建账户
         """
-        password = None
-        if 'password' in request.data.keys():
-            password = make_password(request.data['password'])
+        raw_password = get_code()
+        logger.debug('随机生成密码为：' + raw_password)
+        password = make_password(raw_password)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(password=password)
-        return Response(serializer.data)
+        data = {'raw_password': raw_password}
+        return Response(data)
 
     def update(self, request, *args, **kwargs):
         password = None
@@ -125,6 +140,18 @@ class RoleViewSet(ModelViewSet):
     serializer_class = RoleSerializer
     # 条件过滤器
     filter_class = RoleFilter
+
+    @action(methods=['post'], detail=False)
+    def exists(self, request):
+        """
+        检测角色是否存在
+        """
+        role_name = request.data.get('role_name')
+        roles = Role.objects.filter(name=role_name).all()
+        if len(roles) == 0:
+            return Response(status=status.HTTP_200_OK)
+        else:
+            return Response(data={'msg': '角色已存在！', 'id': roles[0].id}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PermissionViewSet(ModelViewSet):
