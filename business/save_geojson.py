@@ -200,44 +200,47 @@ def form_long_statis_html(test_dict, asix_y, page_legth, file):
 
 class VisHelper:
     def __init__(self, dataset, save_path):
-        self.raw_path = settings.DATASET_PATH
-        self.dataset = dataset
-        self.save_path = save_path
+        try:
+            self.raw_path = settings.DATASET_PATH
+            self.dataset = dataset
+            self.save_path = save_path
+            self.file_form_status = DatasetStatusEnum.ERROR.value
+            # get type
+            self.config_path = self.raw_path + self.dataset + os.sep + 'config.json'
+            self.data_config = json.load(open(self.config_path, 'r'))
+            if 'dyna' in self.data_config and ['state'] == self.data_config['dyna']['including_types']:
+                self.type = 'state'
+            elif 'grid' in self.data_config and ['state'] == self.data_config['grid']['including_types']:
+                self.type = 'grid'
+            else:
+                self.type = 'trajectory'
+            # get geo and dyna files
+            all_files = os.listdir(self.raw_path + self.dataset)
+            self.geo_file = []
+            self.geo_path = None
+            self.dyna_file = []
+            self.dyna_path = None
+            self.grid_file = []
+            self.grid_path = None
+            for file in all_files:
+                if file.split('.')[1] == 'geo':
+                    self.geo_file.append(file)
+                if file.split('.')[1] == 'dyna':
+                    self.dyna_file.append(file)
+                if file.split('.')[1] == 'grid':
+                    self.grid_file.append(file)
 
-        # get type
-        self.config_path = self.raw_path + self.dataset + '/config.json'
-        self.data_config = json.load(open(self.config_path, 'r'))
-        if 'dyna' in self.data_config and ['state'] == self.data_config['dyna']['including_types']:
-            self.type = 'state'
-        elif 'grid' in self.data_config and ['state'] == self.data_config['grid']['including_types']:
-            self.type = 'grid'
-        else:
-            self.type = 'trajectory'
-        # get geo and dyna files
-        all_files = os.listdir(self.raw_path + self.dataset)
-        self.geo_file = []
-        self.geo_path = None
-        self.dyna_file = []
-        self.dyna_path = None
-        self.grid_file = []
-        self.grid_path = None
-        for file in all_files:
-            if file.split('.')[1] == 'geo':
-                self.geo_file.append(file)
-            if file.split('.')[1] == 'dyna':
-                self.dyna_file.append(file)
-            if file.split('.')[1] == 'grid':
-                self.grid_file.append(file)
+            assert len(self.geo_file) == 1
 
-        assert len(self.geo_file) == 1
+            # reserved columns
+            self.geo_reserved_lst = ['type', 'coordinates']
+            self.dyna_reserved_lst = ['dyna_id', 'type', 'time', 'entity_id', 'traj_id', 'coordinates']
+            self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
+        except Exception:
+            pass
 
-        # reserved columns
-        self.geo_reserved_lst = ['type', 'coordinates']
-        self.dyna_reserved_lst = ['dyna_id', 'type', 'time', 'entity_id', 'traj_id', 'coordinates']
-        self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
 
     def visualize(self):
-        file_form_status = DatasetStatusEnum.ERROR.value
         try:
             if self.type == 'trajectory':
                 # geo
@@ -257,11 +260,10 @@ class VisHelper:
                 for grid_file in self.grid_file:
                     self.grid_path = self.raw_path + self.dataset + '/' + grid_file
                     self._visualize_grid()
-            file_form_status = DatasetStatusEnum.PROCESSING_COMPLETE.value
-            return file_form_status
-        except:
-            return file_form_status
-
+            self.file_form_status = DatasetStatusEnum.PROCESSING_COMPLETE.value
+            return self.file_form_status
+        except Warning:
+            return self.file_form_status
 
     def _visualize_state(self):
         geo_file = pd.read_csv(self.geo_path, index_col=None)
@@ -425,6 +427,8 @@ def get_geo_json(dataset, save_path):
     try:
         helper = VisHelper(dataset, save_path)
         file_form_status = helper.visualize()
-    except:
+        return file_form_status
+    except Exception:
         file_form_status = DatasetStatusEnum.ERROR.value
-    return file_form_status
+        print(file_form_status)
+        return file_form_status
