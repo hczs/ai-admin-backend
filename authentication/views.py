@@ -122,16 +122,9 @@ class AccountViewSet(ModelViewSet):
 
 class LogOutView(APIView):
     """
-    TODO 退出登录
+    退出登录
     """
-
     def get(self, request, *args, **kwargs):
-        """
-        拉黑 refresh_token
-        """
-        # byte_token = request.auth.token
-        # token = RefreshToken(byte_token)
-        # token.blacklist()
         return Response(status=status.HTTP_200_OK)
 
 
