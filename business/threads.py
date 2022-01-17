@@ -73,6 +73,8 @@ class ExecuteGeojsonThread(threading.Thread):
             logger.info(self.file_name + 'geojson文件生成完毕')
             file_view_status = transfer_geo_json(self.extract_path + '_geo_json', self.file_name)
             logger.info(self.file_name + "数据可视化处理完毕")
+        else:
+            logger.info(self.file_name + '无法生成geojson文件')
         # 处理完毕，更新数据集状态
         file_obj.dataset_status = file_view_status
         file_obj.save()
