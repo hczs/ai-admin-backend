@@ -8,7 +8,7 @@ from loguru import logger
 from business.enums import TaskStatusEnum, DatasetStatusEnum
 from business.evaluate import evaluate_insert
 from business.models import Task, File
-from common.utils import execute_cmd
+from common.utils import execute_cmd, parentheses_escape
 from business.save_geojson import transfer_geo_json, get_geo_json
 
 
@@ -35,8 +35,8 @@ class ExecuteCommandThread(threading.Thread):
         task.save()
         # 执行
         self.str_command = settings.ACTIVE_VENV + ' && ' + self.str_command
-        logger.info('execute command: ' + self.str_command)
-        status, output = execute_cmd(self.str_command)
+        logger.info('execute command: ' + parentheses_escape(self.str_command))
+        status, output = execute_cmd(parentheses_escape(self.str_command))
         if status == 0:
             # 更新为已完成状态
             task.task_status = TaskStatusEnum.COMPLETED.value
