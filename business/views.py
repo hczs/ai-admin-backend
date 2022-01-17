@@ -12,7 +12,6 @@ from django.shortcuts import render
 # Create your views here.
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from loguru import logger
 from rest_framework import status, renderers, mixins
 from rest_framework.decorators import action, renderer_classes
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin
@@ -30,7 +29,7 @@ from business.serializers import FileSerializer, TaskSerializer, TaskListSeriali
     TrafficStateEtaSerializer, MapMatchingSerializer, TrajLocPredSerializer
 from business.evaluate import evaluate_insert
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
-from business.threads import ExecuteCommandThread, ExecuteGeojsonThread, HandleUploadFileThread
+from business.threads import ExecuteCommandThread, ExecuteGeojsonThread
 from common.response import PassthroughRenderer
 from common.utils import read_file_str, generate_download_file
 from bs4 import BeautifulSoup
@@ -74,9 +73,41 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         数据集文件上传处理
         """
         my_file = self.request.FILES.get('dataset', None)
-        # 上传文件处理
-        HandleUploadFileThread(my_file, serializer).start()
-        logger.info('Started HandleUploadFileThread')
+        path = settings.DATASET_PATH
+        # 目录不存在则新建目录
+        if not os.path.isdir(path):
+            os.makedirs(path)
+        file_size = my_file.size
+        original_file_name, ext = os.path.splitext(my_file.name)
+        file_path = file_duplication_handle(original_file_name, ext, path, 1)  # zip文件路径
+        path, file_name_and_ext = os.path.split(file_path)
+        file_name, ext = os.path.splitext(file_name_and_ext)
+        extract_path = os.path.join(path, file_name)  # 解压目录，解压到zip文件名下的文件夹目录
+        # 创建解压目录
+        if not os.path.isdir(extract_path):
+            os.makedirs(extract_path)
+        with open(os.path.join(path, file_name_and_ext), 'wb+') as f:
+            for chunk in my_file.chunks():
+                f.write(chunk)
+            # 写入完毕解压缩文件
+            zip_file = zipfile.ZipFile(f)
+            zip_list = zip_file.namelist()
+            for every in zip_list:
+                tmp_name, ext = os.path.splitext(every)
+                if (ext != "" or len(ext) != 0) and tmp_name:
+                    extract_without_folder(f, every, extract_path)
+            zip_file.close()
+        serializer.save(file_name=file_name, file_path=file_path, file_size=file_size,
+                        extract_path=extract_path, dataset_status=DatasetStatusEnum.PROCESSING.value)
+        # 生成geojson的json文件
+        url = settings.ADMIN_FRONT_HTML_PATH + 'homepage.html'  # 网页地址
+        soup = BeautifulSoup(open(url, encoding='utf-8'), features='html.parser')
+        content = str.encode(soup.prettify())  # 获取页面内容
+        fp = open(settings.ADMIN_FRONT_HTML_PATH + file_name + ".html", "w+b")  # 打开一个文本文件
+        fp.write(content)  # 写入数据
+        fp.close()  # 关闭文件
+        # 启动执行任务线程，使用json生成folium的html展示页面
+        ExecuteGeojsonThread(extract_path, file_name).start()
 
     def perform_destroy(self, instance):
         # 删除记录先删除对应文件
@@ -321,3 +352,35 @@ class TrajLocPredViewSet(ModelViewSet):
     queryset = TrajLocPred.objects.all()
     serializer_class = TrajLocPredSerializer
     filterset_fields = ['task']
+
+
+def file_duplication_handle(original_file_name, ext, path, index):
+    """
+    检测文件名是否重复，若重复则将文件名加(index)后缀
+    """
+    file_path = path + original_file_name + ext
+    if os.path.isfile(file_path):
+        tmp_file_name = original_file_name + '(' + str(index) + ')'
+        file_path = path + tmp_file_name + ext
+        if os.path.isfile(file_path):
+            return file_duplication_handle(original_file_name, ext, path, index + 1)
+        else:
+            return file_path
+    else:
+        return file_path
+
+
+def extract_without_folder(arc_name, full_item_name, folder):
+    """
+    解压压缩包中的指定文件到指定目录
+
+    :param arc_name: 压缩包文件
+    :param full_item_name: 压缩包中指定文件的全路径，相对压缩包的相对路径
+    :param folder: 解压的目标目录，绝对路径
+    """
+    with zipfile.ZipFile(arc_name) as zf:
+        file_data = zf.read(full_item_name)
+    # 中文乱码解决
+    full_item_name = full_item_name.encode('cp437').decode('gbk')
+    with open(os.path.join(folder, os.path.basename(full_item_name)), "wb") as file_out:
+        file_out.write(file_data)

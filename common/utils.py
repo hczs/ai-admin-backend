@@ -6,7 +6,6 @@ __all__ = ['pybyte']
 import os
 
 import subprocess
-import zipfile
 
 from django.http import FileResponse
 import random
@@ -130,35 +129,3 @@ def parentheses_escape(raw_string):
     :return: 转义后字符串
     """
     return raw_string.replace('(', '\\(').replace(')', '\\)')
-
-
-def extract_without_folder(arc_name, full_item_name, folder):
-    """
-    解压压缩包中的指定文件到指定目录
-
-    :param arc_name: 压缩包文件
-    :param full_item_name: 压缩包中指定文件的全路径，相对压缩包的相对路径
-    :param folder: 解压的目标目录，绝对路径
-    """
-    with zipfile.ZipFile(arc_name) as zf:
-        file_data = zf.read(full_item_name)
-    # 中文乱码解决
-    full_item_name = full_item_name.encode('cp437').decode('gbk')
-    with open(os.path.join(folder, os.path.basename(full_item_name)), "wb") as file_out:
-        file_out.write(file_data)
-
-
-def file_duplication_handle(original_file_name, ext, path, index):
-    """
-    检测文件名是否重复，若重复则将文件名加(index)后缀
-    """
-    file_path = path + original_file_name + ext
-    if os.path.isfile(file_path):
-        tmp_file_name = original_file_name + '(' + str(index) + ')'
-        file_path = path + tmp_file_name + ext
-        if os.path.isfile(file_path):
-            return file_duplication_handle(original_file_name, ext, path, index + 1)
-        else:
-            return file_path
-    else:
-        return file_path
