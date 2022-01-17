@@ -12,6 +12,7 @@ from django.shortcuts import render
 # Create your views here.
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+from loguru import logger
 from rest_framework import status, renderers, mixins
 from rest_framework.decorators import action, renderer_classes
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin
@@ -73,6 +74,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         数据集文件上传处理
         """
         my_file = self.request.FILES.get('dataset', None)
+        logger.info('已接受到文件，正在进行处理，文件名: ' + my_file.name)
+        start = time.time()
         path = settings.DATASET_PATH
         # 目录不存在则新建目录
         if not os.path.isdir(path):
@@ -99,6 +102,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
             zip_file.close()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size,
                         extract_path=extract_path, dataset_status=DatasetStatusEnum.PROCESSING.value)
+        logger.info('文件上传完毕，文件名: ' + file_name)
         # 生成geojson的json文件
         url = settings.ADMIN_FRONT_HTML_PATH + 'homepage.html'  # 网页地址
         soup = BeautifulSoup(open(url, encoding='utf-8'), features='html.parser')
@@ -106,6 +110,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         fp = open(settings.ADMIN_FRONT_HTML_PATH + file_name + ".html", "w+b")  # 打开一个文本文件
         fp.write(content)  # 写入数据
         fp.close()  # 关闭文件
+        end = time.time()
+        logger.info('上传文件初步处理运行时间: {} s；下面进行geojson和html文件的生成', end - start)
         # 启动执行任务线程，使用json生成folium的html展示页面
         ExecuteGeojsonThread(extract_path, file_name).start()
 
