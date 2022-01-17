@@ -60,7 +60,6 @@ class ExecuteGeojsonThread(threading.Thread):
     """
 
     def __init__(self, extract_path, thread_name):
-        # self.str_command = str_command
         self.file_name = thread_name
         self.extract_path = extract_path
         super(ExecuteGeojsonThread, self).__init__(name=thread_name)
@@ -68,9 +67,11 @@ class ExecuteGeojsonThread(threading.Thread):
     def run(self):
         file_view_status = DatasetStatusEnum.ERROR.value
         file_obj = File.objects.get(file_name=self.file_name)
+        logger.info(self.file_name + 'geojson文件开始生成')
         file_form_status = get_geo_json(self.file_name, self.extract_path + '_geo_json')
         if file_form_status == DatasetStatusEnum.PROCESSING_COMPLETE.value:
             logger.info(self.file_name + 'geojson文件生成完毕')
+            logger.info(self.file_name + "数据可视化开始处理")
             file_view_status = transfer_geo_json(self.extract_path + '_geo_json', self.file_name)
             logger.info(self.file_name + "数据可视化处理完毕")
         # 处理完毕，更新数据集状态
