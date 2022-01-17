@@ -120,3 +120,12 @@ def get_code():
         add = random.choice([random.randrange(10), chr(random.randrange(65, 91)), chr(random.randrange(97, 123))])
         code += str(add)
     return code
+
+
+def parentheses_escape(raw_string):
+    """
+    对字符串中的圆括号 '(' ')' 进行转义替换，替换为：'\\(' '\\)'
+    :param raw_string: 原始字符串
+    :return: 转义后字符串
+    """
+    return raw_string.replace('(', '\\(').replace(')', '\\)')
