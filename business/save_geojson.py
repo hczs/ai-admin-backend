@@ -15,6 +15,9 @@ def transfer_geo_json(url, file):
             print(json_file)
             print("-#" * 55)
             return file_view_status
+        elif json_file.count('grid') > 0:
+            file_view_status = show_geo_view(url, json_file, file)
+            return file_view_status
         elif json_file.count('geo') > 0:
             file_view_status = show_geo_view(url, json_file, file)
             return file_view_status
