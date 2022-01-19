@@ -1,11 +1,17 @@
+from copy import copy
+
 import folium
 import pandas as pd
 import json
 import os
 import altair as alt
 from django.conf import settings
+from folium.plugins import HeatMap, MarkerCluster
+
 from business.enums import DatasetStatusEnum
 from loguru import logger
+
+from common.utils import get_json_features
 
 
 def transfer_geo_json(url, file):
@@ -27,34 +33,103 @@ def transfer_geo_json(url, file):
 
 
 def show_geo_view(url, json_file, file):
-    geo_layer = f"{url}/{json_file}"
+    geo_layer = f"{url}" + os.sep + f"{json_file}"
     view_json = json.load(open(geo_layer, 'r'))
-    for _ in view_json['features']:
-        if len(_['geometry']['coordinates']) > 0:
-            if type(_['geometry']['coordinates'][0]) is not list:
-                origin_location = _['geometry']['coordinates']
-            else:
-                if type(_['geometry']['coordinates'][0][0]) is not list:
-                    origin_location = _['geometry']['coordinates'][0]
-                else:
-                    origin_location = _['geometry']['coordinates'][0][0]
-            try:
-                loc1 = origin_location[0]
-                loc = origin_location[1:]
+    _ = view_json['features'][0]
+    origin_location = return_location(_)
+    print(origin_location)
+    if origin_location is not None:
+        try:
+            # loc1 = origin_location[0]
+            # loc = origin_location[1:]
+            # loc.append(loc1)
+            # m = folium.Map(location=loc, tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+            #                zoom_start=12,
+            #                attr='default')
+            # folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+            # folium.LayerControl().add_to(m)
+            # geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
+            # m.save(geo_view_path)
+            # file_view_status = DatasetStatusEnum.SUCCESS.value
+            feature_list = get_json_features(json_path=geo_layer)
+            print(feature_list[:10])
+            print("表头数量:", len(feature_list))
+            loc1 = origin_location[0]
+            loc = origin_location[1:]
+            loc.append(loc1)
+            heat = []
+            m = folium.Map(
+                location=loc,
+                tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                zoom_start=12, attr='default'
+            )
+            for _ in view_json['features']:
+                location_str = return_location(_)
+                loc1 = location_str[0]
+                loc = location_str[1:]
                 loc.append(loc1)
-                m = folium.Map(location=loc, tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                               zoom_start=12,
-                               attr='default')
-                folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
-                folium.LayerControl().add_to(m)
-                geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
-                m.save(geo_view_path)
-                file_view_status = DatasetStatusEnum.SUCCESS.value
-            except:
-                file_view_status = DatasetStatusEnum.ERROR.value
+                heatmap = copy(loc)
+                #   所有可能的展示组合
+                #   features_properties_traffic_speed
+                #   features_properties_inflow, features_properties_outflow
+                if 'features_properties_traffic_speed' in feature_list:
+                    heatmap.append(_['properties']['traffic_speed'])
+                    heat.append(heatmap)
+                    folium.Marker(
+                        location=loc,
+                        popup=str(_['properties']['traffic_speed']),
+                        color='crimson',
+                        fill=False,
+                    ).add_to(m)
+                elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
+                    heatmap.append(_['properties']['inflow'] - _['properties']['outflow'])
+                    heat.append(heatmap)
+                    # folium.Marker(
+                    #     location=loc,
+                    #     popup=str(_['properties']['inflow']-_['properties']['outflow']),
+                    #     color='crimson',
+                    #     fill=False,
+                    # ).add_to(m)
+                elif 'features_properties_usr_id' in feature_list:
+                    folium.Marker(
+                        location=loc,
+                        popup=str(_['properties']['usr_id']),
+                        color='crimson',
+                        fill=False,
+                    ).add_to(m)
+            HeatMap(heat).add_to(m)
+            marker_cluster = MarkerCluster().add_to(m)
+
+            # add data point to the mark cluster
+            for lat, lng, label in heat:
+                folium.Marker(
+                    location=[lat, lng],
+                    icon=None,
+                    popup=label,
+                ).add_to(marker_cluster)
+            folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+            folium.LayerControl().add_to(m)
+            geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
+            m.save(geo_view_path)
+            file_view_status = DatasetStatusEnum.SUCCESS.value
+        except Exception:
+            file_view_status = DatasetStatusEnum.ERROR.value
+    else:
+        file_view_status = show_data_statis(url, file)
+    return file_view_status
+
+
+def return_location(block):
+    location = None
+    if len(block['geometry']['coordinates']) > 0:
+        if type(block['geometry']['coordinates'][0]) is not list:
+            location = block['geometry']['coordinates']
         else:
-            file_view_status = show_data_statis(url, file)
-        return file_view_status
+            if type(block['geometry']['coordinates'][0][0]) is not list:
+                location = block['geometry']['coordinates'][0]
+            else:
+                location = block['geometry']['coordinates'][0][0]
+    return location
 
 
 def show_data_statis(url, file):
@@ -64,23 +139,23 @@ def show_data_statis(url, file):
             data = pd.read_csv(settings.DATASET_PATH + file + os.sep + files, index_col='dyna_id')
             if 'traffic_flow' in data:
                 try:
-                    min = data.entity_id.min()
-                    max = data.entity_id.max()
+                    min_value = data.entity_id.min()
+                    max_value = data.entity_id.max()
                     test_dict = {'id': [], 'abs_flow': []}
                     for i in data.entity_id.unique():
                         abs_flow = data.traffic_flow[data.entity_id == int(i)].mean()
                         test_dict['id'].append(i)
                         test_dict['abs_flow'].append(abs_flow)
                         pass
-                    form_statis_html(test_dict, 'abs_flow', min, max, file)
+                    form_statis_html(test_dict, 'abs_flow', min_value, max_value, file)
                     file_view_status = DatasetStatusEnum.SUCCESS.value
-                except:
+                except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
             elif 'in_flow' in data and 'out_flow' in data:
                 try:
-                    min = data.entity_id.min()
-                    max = data.entity_id.max()
+                    min_value = data.entity_id.min()
+                    max_value = data.entity_id.max()
                     test_dict = {'id': [], 'abs_flow': []}
                     for i in data.entity_id.unique():
                         inflow = data.in_flow[data.entity_id == int(i)].mean()
@@ -88,15 +163,15 @@ def show_data_statis(url, file):
                         test_dict['id'].append(i)
                         test_dict['abs_flow'].append(inflow - outflow)
                         pass
-                    form_statis_html(test_dict, 'abs_flow', min, max, file)
+                    form_statis_html(test_dict, 'abs_flow', min_value, max_value, file)
                     file_view_status = DatasetStatusEnum.SUCCESS.value
-                except:
+                except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
                 try:
-                    min = data.entity_id.min()
-                    max = data.entity_id.max()
+                    min_value = data.entity_id.min()
+                    max_value = data.entity_id.max()
                     test_dict = {'id': [], 'abs_flow': []}
                     for i in data.entity_id.unique():
                         inflow = data.inflow[data.entity_id == int(i)].mean()
@@ -104,39 +179,39 @@ def show_data_statis(url, file):
                         test_dict['id'].append(i)
                         test_dict['abs_flow'].append(inflow - outflow)
                         pass
-                    form_statis_html(test_dict, 'abs_flow', min, max, file)
+                    form_statis_html(test_dict, 'abs_flow', min_value, max_value, file)
                     file_view_status = DatasetStatusEnum.SUCCESS.value
-                except:
+                except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
             elif 'traffic_speed' in data:
                 try:
-                    min = data.entity_id.min()
-                    max = data.entity_id.max()
+                    min_value = data.entity_id.min()
+                    max_value = data.entity_id.max()
                     test_dict = {'id': [], 'traffic_speed': []}
                     for i in data.entity_id.unique():
                         abs_flow = data.traffic_speed[data.entity_id == int(i)].mean()
                         test_dict['id'].append(i)
                         test_dict['traffic_speed'].append(abs_flow)
                         pass
-                    form_statis_html(test_dict, 'traffic_speed', min, max, file)
+                    form_statis_html(test_dict, 'traffic_speed', min_value, max_value, file)
                     file_view_status = DatasetStatusEnum.SUCCESS.value
-                except:
+                except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
             elif 'traffic_intensity' in data:
                 try:
-                    min = data.entity_id.min()
-                    max = data.entity_id.max()
+                    min_value = data.entity_id.min()
+                    max_value = data.entity_id.max()
                     test_dict = {'id': [], 'traffic_intensity': []}
                     for i in data.entity_id.unique():
                         abs_flow = data.traffic_intensity[data.entity_id == int(i)].mean()
                         test_dict['id'].append(i)
                         test_dict['traffic_intensity'].append(abs_flow)
                         pass
-                    form_statis_html(test_dict, 'traffic_intensity', min, max, file)
+                    form_statis_html(test_dict, 'traffic_intensity', min_value, max_value, file)
                     file_view_status = DatasetStatusEnum.SUCCESS.value
-                except:
+                except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
         if files.count('grid') > 0:
@@ -178,10 +253,10 @@ def show_data_statis(url, file):
                 return file_view_status
 
 
-def form_statis_html(test_dict, asix_y, min, max, file):
+def form_statis_html(test_dict, asix_y, min_value, max_value, file):
     test_dict_df = pd.DataFrame(test_dict)
-    chart = alt.Chart(test_dict_df).mark_point().encode(
-        x=alt.X('id', scale=alt.Scale(domain=[min, max])),
+    chart = alt.Chart(test_dict_df, title='Mean of ' + f"{asix_y}" + ' on timeseries').mark_point().encode(
+        x=alt.X('id', scale=alt.Scale(domain=[min_value, max_value])),
         y=asix_y,
     ).properties(
         width=1000
@@ -242,7 +317,6 @@ class VisHelper:
             self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
         except Exception:
             pass
-
 
     def visualize(self):
         try:
