@@ -72,28 +72,29 @@ def show_geo_view(url, json_file, file):
                 #   所有可能的展示组合
                 #   features_properties_traffic_speed
                 #   features_properties_inflow, features_properties_outflow
+                #   features_properties_usr_id
                 if 'features_properties_traffic_speed' in feature_list:
                     heatmap.append(_['properties']['traffic_speed'])
                     heat.append(heatmap)
                     folium.Marker(
                         location=loc,
-                        popup=str(_['properties']['traffic_speed']),
+                        popup='mean_traffic_speed=' + str(_['properties']['traffic_speed']),
                         color='crimson',
                         fill=False,
                     ).add_to(m)
                 elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
                     heatmap.append(_['properties']['inflow'] - _['properties']['outflow'])
                     heat.append(heatmap)
-                    # folium.Marker(
-                    #     location=loc,
-                    #     popup=str(_['properties']['inflow']-_['properties']['outflow']),
-                    #     color='crimson',
-                    #     fill=False,
-                    # ).add_to(m)
+                    folium.Marker(
+                        location=loc,
+                        popup='mean_abs_flow=' + str(_['properties']['inflow']-_['properties']['outflow']),
+                        color='crimson',
+                        fill=False,
+                    ).add_to(m)
                 elif 'features_properties_usr_id' in feature_list:
                     folium.Marker(
                         location=loc,
-                        popup=str(_['properties']['usr_id']),
+                        popup='user_id=' + str(_['properties']['usr_id']),
                         color='crimson',
                         fill=False,
                     ).add_to(m)
