@@ -65,15 +65,42 @@ class ExecuteGeojsonThread(threading.Thread):
         super(ExecuteGeojsonThread, self).__init__(name=thread_name)
 
     def run(self):
-        file_view_status = DatasetStatusEnum.ERROR.value
+        file_view_status = DatasetStatusEnum.UN_PROCESS.value
         file_obj = File.objects.get(file_name=self.file_name)
-        logger.info(self.file_name + 'geojson文件开始生成')
         file_form_status = get_geo_json(self.file_name, self.extract_path + '_geo_json')
         if file_form_status == DatasetStatusEnum.PROCESSING_COMPLETE.value:
             logger.info(self.file_name + 'geojson文件生成完毕')
-            logger.info(self.file_name + "数据可视化开始处理")
-            file_view_status = transfer_geo_json(self.extract_path + '_geo_json', self.file_name)
-            logger.info(self.file_name + "数据可视化处理完毕")
+            # 处理完毕，更新数据集状态
+            file_obj.dataset_status = file_view_status
+        else:
+            logger.info(self.file_name + '无法生成geojson文件')
+            file_obj.dataset_status = file_form_status
+        file_obj.save()
+
+
+class ExecuteGeoViewThread(threading.Thread):
+    """
+    执行命令行命令线程，执行传入的命令str_command
+    """
+
+    def __init__(self, extract_path, thread_name, background_id):
+        # self.str_command = str_command
+        self.file_name = thread_name
+        self.extract_path = extract_path
+        self.background_id = background_id
+        super(ExecuteGeoViewThread, self).__init__(name=thread_name)
+
+    def run(self):
+        file_obj = File.objects.get(file_name=self.file_name)
+        file_view_status = DatasetStatusEnum.PROCESSING.value
+        try:
+            if os.listdir(self.extract_path + '_geo_json') is not None:
+                print(1234)
+                file_view_status = transfer_geo_json(self.extract_path + '_geo_json', self.file_name, self.background_id)
+                print(file_view_status)
+                logger.info(self.file_name + "数据可视化处理完毕")
+        except Exception:
+            file_view_status = DatasetStatusEnum.ERROR.value
         # 处理完毕，更新数据集状态
         file_obj.dataset_status = file_view_status
         file_obj.save()

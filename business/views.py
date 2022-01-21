@@ -30,7 +30,7 @@ from business.serializers import FileSerializer, TaskSerializer, TaskListSeriali
     TrafficStateEtaSerializer, MapMatchingSerializer, TrajLocPredSerializer
 from business.evaluate import evaluate_insert
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
-from business.threads import ExecuteCommandThread, ExecuteGeojsonThread
+from business.threads import ExecuteCommandThread, ExecuteGeojsonThread, ExecuteGeoViewThread
 from common.response import PassthroughRenderer
 from common.utils import read_file_str, generate_download_file
 from bs4 import BeautifulSoup
@@ -73,9 +73,9 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         数据集文件上传处理
         """
+        start = time.time()
         my_file = self.request.FILES.get('dataset', None)
         logger.info('已接受到文件，正在进行处理，文件名: ' + my_file.name)
-        start = time.time()
         path = settings.DATASET_PATH
         # 目录不存在则新建目录
         if not os.path.isdir(path):
@@ -101,7 +101,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                     extract_without_folder(f, every, extract_path)
             zip_file.close()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size,
-                        extract_path=extract_path, dataset_status=DatasetStatusEnum.PROCESSING.value)
+                        extract_path=extract_path, dataset_status=DatasetStatusEnum.UN_PROCESS.value)
         logger.info('文件上传完毕，文件名: ' + file_name)
         # 生成geojson的json文件
         url = settings.ADMIN_FRONT_HTML_PATH + 'homepage.html'  # 网页地址
@@ -111,12 +111,13 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         fp.write(content)  # 写入数据
         fp.close()  # 关闭文件
         end = time.time()
-        logger.info('上传文件初步处理运行时间: {} s；下面进行geojson和html文件的生成', end - start)
+        logger.info('上传文件初步处理运行时间: {} s；下面进行geojson文件的生成', end - start)
         # 启动执行任务线程，使用json生成folium的html展示页面
         ExecuteGeojsonThread(extract_path, file_name).start()
 
     def perform_destroy(self, instance):
         # 删除记录先删除对应文件
+
         if os.path.isfile(instance.file_path):
             os.remove(instance.file_path)
         if os.path.isdir(instance.extract_path):
@@ -126,6 +127,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         if os.path.isfile(settings.ADMIN_FRONT_HTML_PATH + instance.file_name + '.html'):
             os.remove(settings.ADMIN_FRONT_HTML_PATH + instance.file_name + '.html')
         instance.delete()
+
+
 
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=False)
@@ -141,11 +144,22 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         根据任务id获取geojson转化的gis图象地址
         """
         file = self.get_object()
-        # print(file)
-        # file_name = file.file_name # wheather pk or exp_id
         file_gis_path = str(file) + ".html"
         return file_gis_path
 
+    @action(methods=['get'], detail=True)
+    def generate_gis_view(self, request, *args, **kwargs):
+        """
+        根据任务id获取geojson转化的gis图象地址
+        """
+        # 生成geojson的json文件
+        background_id = request.query_params.get('background')
+        dataset = self.get_object()
+        dataset.dataset_status = DatasetStatusEnum.PROCESSING.value
+        dataset.save()
+        # 启动执行任务线程，使用json生成folium的html展示页面
+        ExecuteGeoViewThread(dataset.extract_path, dataset.file_name, background_id).start()
+        return Response(status=status.HTTP_200_OK)
 
 class TaskViewSet(ModelViewSet):
     queryset = Task.objects.all()
