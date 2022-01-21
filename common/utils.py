@@ -4,8 +4,6 @@ import math
 __all__ = ['pybyte']
 
 import os
-import csv
-import json
 import subprocess
 
 from django.http import FileResponse
@@ -150,25 +148,21 @@ def get_json_features(json_path):
     with open(json_path, 'r', encoding='UTF-8') as file_in:
         data_str = file_in.read()
     get_json_head(data_str)
-    print(feature_list[:10])
     return feature_list
 
 
 def get_json_head(data, loc=""):
     data = str(data)  # 将数据转换成字符串
-
     data_type = query_type(data)
     if data_type == "value":  # 如果是元素
         if loc[1:] not in feature_list:
             feature_list.append(loc[1:])
         return
-
     if data_type == "dict":  # 如果是字典
         data_dict = eval(data)
         for key in data_dict:
             get_json_head(data_dict[key], loc + "_" + key)
         return
-
     if data_type == "list":  # 如果是列表
         data_list = list(eval(data))
         for item in data_list:

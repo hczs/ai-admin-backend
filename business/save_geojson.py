@@ -9,71 +9,70 @@ from django.conf import settings
 from folium.plugins import HeatMap, MarkerCluster
 
 from business.enums import DatasetStatusEnum
+from common.utils import get_json_features
 from loguru import logger
 
-from common.utils import get_json_features
 
-
-def transfer_geo_json(url, file):
+def transfer_geo_json(url, file, background_id):
     for json_file in os.listdir(url):
         if json_file.count('dyna') > 0:
-            file_view_status = show_geo_view(url, json_file, file)
-            print(json_file)
-            print("-#" * 55)
+            file_view_status = show_geo_view(url, json_file, file, background_id)
             return file_view_status
         elif json_file.count('grid') > 0:
-            file_view_status = show_geo_view(url, json_file, file)
+            file_view_status = show_geo_view(url, json_file, file, background_id)
             return file_view_status
         elif json_file.count('geo') > 0:
-            file_view_status = show_geo_view(url, json_file, file)
+            file_view_status = show_geo_view(url, json_file, file, background_id)
             return file_view_status
         else:
             file_view_status = show_data_statis(url, file)
             return file_view_status
 
 
-def show_geo_view(url, json_file, file):
+def show_geo_view(url, json_file, file, background_id):
     geo_layer = f"{url}" + os.sep + f"{json_file}"
     view_json = json.load(open(geo_layer, 'r'))
     _ = view_json['features'][0]
     origin_location = return_location(_)
-    print(origin_location)
     if origin_location is not None:
+        logger.info('尝试绘制' + geo_layer + '文件的地理图象')
+        print(background_id)
+        if int(background_id) == 1:
+            background_url = 'https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
+        elif int(background_id) == 2:
+            background_url = 'OpenStreetMap'
+        elif int(background_id) == 3:
+            background_url = 'https://webrd02.is.autonavi.com/appmaptile?lang=zh_en&size=1&scale=1&style=8&x={' \
+                             'x}&y={y}&z={z} '
+        else:
+            background_url = 'OpenStreetMap'
         try:
-            # loc1 = origin_location[0]
-            # loc = origin_location[1:]
-            # loc.append(loc1)
-            # m = folium.Map(location=loc, tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-            #                zoom_start=12,
-            #                attr='default')
-            # folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
-            # folium.LayerControl().add_to(m)
-            # geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
-            # m.save(geo_view_path)
-            # file_view_status = DatasetStatusEnum.SUCCESS.value
-            feature_list = get_json_features(json_path=geo_layer)
-            print(feature_list[:10])
-            print("表头数量:", len(feature_list))
+            feature_list = get_json_features(geo_layer)
+            print(feature_list)
+            # logger.info('json文件的可标记属性' + feature_list)
             loc1 = origin_location[0]
             loc = origin_location[1:]
             loc.append(loc1)
             heat = []
             m = folium.Map(
                 location=loc,
-                tiles='https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                tiles=background_url,
                 zoom_start=12, attr='default'
             )
-            for _ in view_json['features']:
-                location_str = return_location(_)
-                loc1 = location_str[0]
-                loc = location_str[1:]
-                loc.append(loc1)
-                heatmap = copy(loc)
-                #   所有可能的展示组合
-                #   features_properties_traffic_speed
-                #   features_properties_inflow, features_properties_outflow
-                #   features_properties_usr_id
-                if 'features_properties_traffic_speed' in feature_list:
+            print(background_url)
+            #   所有可能的展示组合
+            #   features_properties_traffic_speed
+            #   features_properties_inflow, features_properties_outflow
+            #   features_properties_length
+            #   features_properties_highway
+            #   features_properties_usr_id
+            if 'features_properties_traffic_speed' in feature_list:
+                for _ in view_json['features']:
+                    location_str = return_location(_)
+                    loc1 = location_str[0]
+                    loc = location_str[1:]
+                    loc.append(loc1)
+                    heatmap = copy(loc)
                     heatmap.append(_['properties']['traffic_speed'])
                     heat.append(heatmap)
                     folium.Marker(
@@ -82,26 +81,75 @@ def show_geo_view(url, json_file, file):
                         color='crimson',
                         fill=False,
                     ).add_to(m)
-                elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
+                HeatMap(heat).add_to(m)
+            elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
+                for _ in view_json['features']:
+                    location_str = return_location(_)
+                    loc1 = location_str[0]
+                    loc = location_str[1:]
+                    loc.append(loc1)
+                    heatmap = copy(loc)
                     heatmap.append(_['properties']['inflow'] - _['properties']['outflow'])
                     heat.append(heatmap)
                     folium.Marker(
                         location=loc,
-                        popup='mean_abs_flow=' + str(_['properties']['inflow']-_['properties']['outflow']),
+                        popup='mean_abs_flow=' + str(_['properties']['inflow'] - _['properties']['outflow']),
                         color='crimson',
                         fill=False,
                     ).add_to(m)
-                elif 'features_properties_usr_id' in feature_list:
+                HeatMap(heat).add_to(m)
+            elif 'features_properties_length' in feature_list:
+                for _ in view_json['features']:
+                    location_str = return_location(_)
+                    loc1 = location_str[0]
+                    loc = location_str[1:]
+                    loc.append(loc1)
+                    heatmap = copy(loc)
+                    heatmap.append(_['properties']['length'])
+                    heat.append(heatmap)
                     folium.Marker(
                         location=loc,
-                        popup='user_id=' + str(_['properties']['usr_id']),
+                        popup='length=' + str(_['properties']['length']),
                         color='crimson',
                         fill=False,
                     ).add_to(m)
-            HeatMap(heat).add_to(m)
-            marker_cluster = MarkerCluster().add_to(m)
-
+                HeatMap(heat).add_to(m)
+            elif 'features_properties_usr_id' in feature_list:
+                location_str = return_location(_)
+                loc1 = location_str[0]
+                loc = location_str[1:]
+                loc.append(loc1)
+                folium.Marker(
+                    location=loc,
+                    popup='user_id=' + str(_['properties']['usr_id']),
+                    color='crimson',
+                    fill=False,
+                ).add_to(m)
+            elif 'features_properties_highway' in feature_list:
+                location_str = return_location(_)
+                loc1 = location_str[0]
+                loc = location_str[1:]
+                loc.append(loc1)
+                folium.Marker(
+                    location=loc,
+                    popup='highway=' + str(_['properties']['highway']),
+                    color='crimson',
+                    fill=False,
+                ).add_to(m)
+            else:
+                property = str(feature_list[-1]).replace('features_properties_','')
+                location_str = return_location(_)
+                loc1 = location_str[0]
+                loc = location_str[1:]
+                loc.append(loc1)
+                folium.Marker(
+                    location=loc,
+                    popup='property=' + str(_['properties'][f"{property}"]),
+                    color='crimson',
+                    fill=False,
+                ).add_to(m)
             # add data point to the mark cluster
+            marker_cluster = MarkerCluster().add_to(m)
             for lat, lng, label in heat:
                 folium.Marker(
                     location=[lat, lng],
@@ -113,8 +161,9 @@ def show_geo_view(url, json_file, file):
             geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
             m.save(geo_view_path)
             file_view_status = DatasetStatusEnum.SUCCESS.value
+            logger.info(geo_layer + '文件的地理图象绘制成功')
         except Exception:
-            file_view_status = DatasetStatusEnum.ERROR.value
+            file_view_status = show_data_statis(url, file)
     else:
         file_view_status = show_data_statis(url, file)
     return file_view_status
@@ -137,6 +186,7 @@ def show_data_statis(url, file):
     file_path = url.replace('_geo_json', '')
     for files in os.listdir(file_path):
         if files.count('dyna') > 0:
+            logger.info('尝试绘制' + files + '文件的[dyna]统计图象')
             data = pd.read_csv(settings.DATASET_PATH + file + os.sep + files, index_col='dyna_id')
             if 'traffic_flow' in data:
                 try:
@@ -216,6 +266,7 @@ def show_data_statis(url, file):
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
         if files.count('grid') > 0:
+            logger.info('尝试绘制' + files + '文件的[grid]统计图象')
             data = pd.read_csv(settings.DATASET_PATH + file + '/' + files, index_col='dyna_id')
             # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
             if 'risk' in data:
@@ -230,7 +281,8 @@ def show_data_statis(url, file):
                             test_dict['risk'].append(risk)
                     form_long_statis_html(test_dict, 'risk', page_legth, file)
                     file_view_status = DatasetStatusEnum.SUCCESS.value
-                except:
+                    logger.info('统计图象绘制完成')
+                except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
@@ -249,7 +301,8 @@ def show_data_statis(url, file):
                             pass
                     form_long_statis_html(test_dict, 'abs_flow', page_legth, file)
                     file_view_status = DatasetStatusEnum.SUCCESS.value
-                except:
+                    logger.info('统计图象绘制完成')
+                except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
 
