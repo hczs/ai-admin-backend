@@ -30,3 +30,4 @@ class DatasetStatusEnum(Enum):
     PROCESSING_COMPLETE = 1  # 用来表示完成geojson文件生成
     ERROR = -1
     SUCCESS = 2  # 用来表示完成html文件生成
+    UN_PROCESS = 3
