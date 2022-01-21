@@ -60,7 +60,6 @@ class ExecuteGeojsonThread(threading.Thread):
     """
 
     def __init__(self, extract_path, thread_name):
-        # self.str_command = str_command
         self.file_name = thread_name
         self.extract_path = extract_path
         super(ExecuteGeojsonThread, self).__init__(name=thread_name)
