@@ -28,7 +28,11 @@ class TaskFilter(FilterSet):
     end = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='lte')
     # 任务名模糊查询
     task_name = django_filters.CharFilter(field_name='task_name', lookup_expr='icontains')
+    # 任务类型精确查询
+    task = django_filters.CharFilter(field_name='task')
+    # 任务状态精确查询
+    task_status = django_filters.CharFilter(field_name='task_status')
 
     class Meta:
         model = Task
-        fields = ['begin', 'end', 'task_name']
+        fields = ['begin', 'end', 'task_name', 'task', 'task_status']

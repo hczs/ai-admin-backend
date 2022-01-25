@@ -1,4 +1,5 @@
 import os
+import platform
 import threading
 import time
 
@@ -35,8 +36,12 @@ class ExecuteCommandThread(threading.Thread):
         task.save()
         # 执行
         self.str_command = settings.ACTIVE_VENV + ' && ' + self.str_command
-        logger.info('execute command: ' + parentheses_escape(self.str_command))
-        status, output = execute_cmd(parentheses_escape(self.str_command))
+        # Linux系统下需要对圆括号进行转义
+        if platform.system().lower() == 'linux':
+            self.str_command = parentheses_escape(self.str_command)
+
+        logger.info('execute command: ' + self.str_command)
+        status, output = execute_cmd(self.str_command)
         if status == 0:
             # 更新为已完成状态
             task.task_status = TaskStatusEnum.COMPLETED.value
