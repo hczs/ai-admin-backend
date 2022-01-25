@@ -20,7 +20,7 @@ from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
-from business.enums import TaskStatusEnum, DatasetStatusEnum
+from business.enums import TaskStatusEnum, DatasetStatusEnum, TaskEnum
 from business.filter import FileFilter, TaskFilter
 from business.models import File, Task, TrafficStatePredAndEta, MapMatching, TrajLocPred
 from business.models import File, Task
@@ -128,8 +128,6 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
             os.remove(settings.ADMIN_FRONT_HTML_PATH + instance.file_name + '.html')
         instance.delete()
 
-
-
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=False)
     def download(self, request):
@@ -161,8 +159,9 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         ExecuteGeoViewThread(dataset.extract_path, dataset.file_name, background_id).start()
         return Response(status=status.HTTP_200_OK)
 
+
 class TaskViewSet(ModelViewSet):
-    queryset = Task.objects.all()
+    queryset = Task.objects.all().order_by('-create_time')
     serializer_class = TaskSerializer
     filter_class = TaskFilter
 
@@ -335,6 +334,163 @@ class TrafficStateEtaViewSet(ModelViewSet):
     queryset = TrafficStatePredAndEta.objects.all()
     serializer_class = TrafficStateEtaSerializer
     filterset_fields = ['task']
+
+    @action(methods=['get'], detail=False)
+    def other_contrast_line(self, request, *args, **kwargs):
+        """
+        轨迹下一跳，到达时间估计，路网匹配 折线图数据返回
+        :param request: task: 需要对比的任务的id的字符串，不同任务id之间以逗号分隔，如：1,2,3 taskType: 任务类型
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        task_ids = request.query_params.get('task')
+        task_type = request.query_params.get('taskType')
+        tasks = None
+        evaluates = None
+        if task_ids and task_type:
+            task_ids = task_ids.split(',')
+            tasks = Task.objects.filter(id__in=task_ids).all()
+            # 根据不同的任务类型，查询不同的评价指标表
+            if task_type == TaskEnum.TRAJ_LOC_PRED.value:
+                # 轨迹下一跳
+                evaluates = TrajLocPred.objects.filter(task_id__in=task_ids).all()
+            elif task_type == TaskEnum.ETA.value:
+                # 到达时间估计
+                evaluates = TrafficStatePredAndEta.objects.filter(task_id__in=task_ids).all()
+            elif task_type == TaskEnum.MAP_MATCHING.value:
+                # 路网匹配
+                evaluates = MapMatching.objects.filter(task_id__in=task_ids).all()
+            else:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+            # 这个字典存储模型和模型对应的指标对象
+            model_evaluate = {}
+            if tasks is not None and evaluates is not None:
+                # 根据task的模型名分组
+                for task in tasks:
+                    model_evaluate[task.model] = []
+                    # 此处evaluates长度为1，就一条数据
+                    for evaluate in evaluates:
+                        if evaluate.task_id == task.id:
+                            model_evaluate[task.model] = evaluate
+            # x轴数据，以模型为x轴
+            xdata = list(model_evaluate.keys())
+            # 响应结果数据
+            result_data = []
+            count = 0
+            # 构造每个折线图的折线图数据
+            for evaluate_name in evaluates[0].__dict__:
+                is_inf = False
+                if evaluates[0].__dict__.get(evaluate_name) is None or evaluates[0].__dict__.get(evaluate_name) == '' \
+                        or evaluate_name == '_state' or evaluate_name == 'id' or evaluate_name == 'task_id':
+                    continue
+                tmp_data = {'id': str(count), 'evaluate_name': evaluate_name, 'xdata': xdata, 'data': []}
+                # 添加折线图数据
+                # line_data = {'type': 'line', 'data': []}
+                # 添加柱形图数据 默认只加柱形图数据
+                bar_data = {'type': 'bar', 'data': [], 'barWidth': '20%'}
+                for x in xdata:
+                    evaluate = model_evaluate.get(x)
+                    value = evaluate.__dict__.get(evaluate_name)
+                    if value == 'inf':
+                        is_inf = True
+                        break
+                    # line_data['data'].append(value)
+                    bar_data['data'].append(value)
+                # tmp_data['data'].append(line_data)
+                tmp_data['data'].append(bar_data)
+                if not is_inf:
+                    result_data.append(tmp_data)  # 只加入不存在inf值的tmp_data
+                count = count + 1
+            return Response(data=result_data, status=status.HTTP_200_OK)
+        # 不同指标查不同的sql
+        return Response(status=status.HTTP_200_OK)
+        # result_data = [{
+        #     "id": "1",
+        #     "evaluate_name": "召回率",
+        #     "xdata": ['GRU', 'RNN'],
+        #     "data": [
+        #         {
+        #             "type": 'bar',
+        #             "data": [10, 90],
+        #             "barWidth": '20%'
+        #         }
+        #     ]
+        # }]
+        # return Response(data=result_data, status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=False)
+    def contrast_line(self, request, *args, **kwargs):
+        """
+        交通状态预测，折线图数据
+        :param request: task: 需要对比的任务的id的字符串，不同任务id之间以逗号分隔，如：1,2,3
+        :param args:
+        :param kwargs:
+        :return: 是每个指标的折线图数据的list
+        """
+        task_ids = request.query_params.get('task')
+        if task_ids:
+            task_ids = task_ids.split(',')
+            tasks = Task.objects.filter(id__in=task_ids).all()
+            evaluates = TrafficStatePredAndEta.objects.filter(task_id__in=task_ids).all()
+            task_evaluates = {}
+            # 根据task的模型名分组
+            for task in tasks:
+                task_evaluates[task.model] = []
+                for evaluate in evaluates:
+                    if evaluate.task_id == task.id:
+                        task_evaluates[task.model].append(evaluate)
+            # 获取所有模型名list
+            legend = list(task_evaluates.keys())
+            # 构造xdata
+            xdata = []
+            for i in range(1, len(task_evaluates.get(tasks[0].model)) + 1):
+                xdata.append(i)
+            # 响应结果数据
+            result_data = []
+            count = 0
+            # 构造每个指标的折线图数据
+            for evaluate_name in evaluates[0].__dict__:
+                is_inf = False
+                if evaluates[0].__dict__.get(evaluate_name) is None or evaluates[0].__dict__.get(evaluate_name) == '' \
+                        or evaluate_name == '_state' or evaluate_name == 'id' or evaluate_name == 'task_id':
+                    continue
+                tmp_data = {'id': str(count), 'evaluate_name': evaluate_name, 'legend':
+                    legend, 'xdata': xdata, 'data': []}
+                for task_model in task_evaluates:
+                    model_data = {'name': task_model, 'type': 'line', 'data': []}
+                    for evaluate in task_evaluates.get(task_model):
+                        # 存在inf值的数据不做返回展示
+                        if evaluate.__dict__.get(evaluate_name) == 'inf':
+                            is_inf = True
+                            break
+                        model_data['data'].append(evaluate.__dict__.get(evaluate_name))
+                    tmp_data['data'].append(model_data)
+                if not is_inf:
+                    result_data.append(tmp_data)  # 只加入不存在inf值的tmp_data
+                count = count + 1
+            return Response(data=result_data, status=status.HTTP_200_OK)
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        # 返回的是result_data的list，一个指标对应一个result_data
+        # result_data = {
+        #     "evaluate_name": "召回率",
+        #     "legend": ['GRU', 'RNN'],
+        #     "xdata": [1, 3, 5, 6, 8],
+        #     "data": [
+        #         {
+        #             "name": 'GRU',
+        #             "type": 'line',
+        #             "data": [10, 90, 60, 30, 50]
+        #         },
+        #         {
+        #             "name": 'RNN',
+        #             "type": 'line',
+        #             "data": [80, 30, 20, 30, 50]
+        #         }
+        #     ]
+        # }
+        # return Response(data=result_data, status=status.HTTP_200_OK)
 
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=False)
