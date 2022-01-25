@@ -52,7 +52,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # 有些zip当中存在其他类型文件（如.grid），需要核实
-        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid']
+        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid', '.gridod']
         my_file = self.request.FILES.get('dataset', None)
         if not my_file:
             return Response(data={'detail': '未检测到文件！'}, status=status.HTTP_400_BAD_REQUEST)
@@ -101,7 +101,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                     extract_without_folder(f, every, extract_path)
             zip_file.close()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size,
-                        extract_path=extract_path, dataset_status=DatasetStatusEnum.UN_PROCESS.value)
+                        extract_path=extract_path, dataset_status=DatasetStatusEnum.ERROR.value)
         logger.info('文件上传完毕，文件名: ' + file_name)
         # 生成geojson的json文件
         url = settings.ADMIN_FRONT_HTML_PATH + 'homepage.html'  # 网页地址
