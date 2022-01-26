@@ -205,7 +205,7 @@ def show_data_statis(url, file):
                         test_dict['net_flow'].append(net_flow)
                         pass
                     form_statis_html(test_dict, 'net_flow', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
@@ -221,7 +221,7 @@ def show_data_statis(url, file):
                         test_dict['net_flow'].append(inflow - outflow)
                         pass
                     form_statis_html(test_dict, 'net_flow', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
@@ -237,7 +237,7 @@ def show_data_statis(url, file):
                         test_dict['net_flow'].append(inflow - outflow)
                         pass
                     form_statis_html(test_dict, 'net_flow', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
@@ -253,7 +253,7 @@ def show_data_statis(url, file):
                         test_dict['net_flow'].append(pickup - dropoff)
                         pass
                     form_statis_html(test_dict, 'net_quantity', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
@@ -268,7 +268,7 @@ def show_data_statis(url, file):
                         test_dict['traffic_speed'].append(net_flow)
                         pass
                     form_statis_html(test_dict, 'traffic_speed', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
@@ -283,7 +283,7 @@ def show_data_statis(url, file):
                         test_dict['traffic_intensity'].append(net_flow)
                         pass
                     form_statis_html(test_dict, 'traffic_intensity', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
@@ -305,7 +305,7 @@ def show_data_statis(url, file):
                             test_dict['id'].append(f"{i}" + f", {j}")
                             test_dict['risk'].append(risk)
                     form_long_statis_html(test_dict, 'risk', page_legth, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                     logger.info('统计图象绘制完成')
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
@@ -325,7 +325,7 @@ def show_data_statis(url, file):
                             test_dict['net_flow'].append(inflow - outflow)
                             pass
                     form_long_statis_html(test_dict, 'net_flow', page_legth, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                     logger.info('统计图象绘制完成')
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
@@ -345,7 +345,7 @@ def show_data_statis(url, file):
                             test_dict['net_quantity'].append(pickup - dropoff)
                             pass
                     form_long_statis_html(test_dict, 'net_quantity', page_legth, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                     logger.info('统计图象绘制完成')
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value
@@ -367,7 +367,7 @@ def show_data_statis(url, file):
                             test_dict['net_departing_volume'].append(departing_volume - arriving_volume)
                             pass
                     form_long_statis_html(test_dict, 'net_departing_volume', page_legth, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS.value
+                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
                     logger.info('统计图象绘制完成')
                 except Exception:
                     file_view_status = DatasetStatusEnum.ERROR.value

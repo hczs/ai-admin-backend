@@ -107,7 +107,7 @@ class ExecuteGeoViewThread(threading.Thread):
         except Exception:
             file_view_status = DatasetStatusEnum.ERROR.value
         # 处理完毕，更新数据集状态
-        if file_view_status == DatasetStatusEnum.SUCCESS.value:
+        if file_view_status == DatasetStatusEnum.SUCCESS.value or DatasetStatusEnum.SUCCESS_stat.value:
             logger.info(self.file_name + "数据可视化处理完毕")
         else:
             logger.info(self.file_name + "数据可视化处理失败")
