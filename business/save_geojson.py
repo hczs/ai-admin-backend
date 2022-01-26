@@ -60,7 +60,7 @@ def show_geo_view(url, json_file, file, background_id):
         elif int(background_id) == 7:
             background_url = 'https://stamen-tiles-{s}.a.ssl.fastly.net/toner-hybrid/{z}/{x}/{y}{r}.png'
         else:
-            background_url = 'OpenStreetMap'
+            background_url = 'https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
         try:
             feature_list = get_json_features(geo_layer)
             print(feature_list)
