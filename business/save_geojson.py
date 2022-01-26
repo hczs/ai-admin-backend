@@ -11,9 +11,12 @@ from folium.plugins import HeatMap, MarkerCluster
 from business.enums import DatasetStatusEnum
 from common.utils import get_json_features
 from loguru import logger
-from ipywidgets import interact
+
 
 def transfer_geo_json(url, file, background_id):
+    """
+    通过文件路径获取geojson文件，根据文件的类型进行可视化
+    """
     for json_file in os.listdir(url):
         if json_file.count('dyna') > 0:
             if json_file.count('_truth_dyna') > 0:
@@ -30,7 +33,6 @@ def transfer_geo_json(url, file, background_id):
         else:
             file_view_status = show_data_statis(url, file)
             return file_view_status
-
 
 
 def show_geo_view(url, json_file, file, background_id):
@@ -108,7 +110,7 @@ def show_geo_view(url, json_file, file, background_id):
                         heat.append(heatmap)
                         folium.Marker(
                             location=loc,
-                            popup='mean_net_flow=' + str(_['properties']['inflow']-_['properties']['outflow']),
+                            popup='mean_net_flow=' + str(_['properties']['inflow'] - _['properties']['outflow']),
                         ).add_to(marker_cluster)
                 HeatMap(heat).add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
@@ -148,7 +150,7 @@ def show_geo_view(url, json_file, file, background_id):
                 ).add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             else:
-                property = str(feature_list[-1]).replace('features_properties_','')
+                property = str(feature_list[-1]).replace('features_properties_', '')
                 location_str = return_location(_)
                 loc1 = location_str[0]
                 loc = location_str[1:]
@@ -161,11 +163,9 @@ def show_geo_view(url, json_file, file, background_id):
                 ).add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             # add data point to the mark cluster
-
             folium.LayerControl().add_to(m)
             geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
-            interaction = interact(m)
-            interaction.save(geo_view_path)
+            m.save(geo_view_path)
             file_view_status = DatasetStatusEnum.SUCCESS.value
             logger.info(geo_layer + '文件的地理图象绘制成功')
         except Exception:
@@ -357,8 +357,10 @@ def show_data_statis(url, file):
                     for i in data.row_id.unique():
                         for j in data.column_id.unique():
                             page_legth += 1
-                            departing_volume = data.departing_volume[data.row_id == int(i)][data.column_id == int(j)].mean()
-                            arriving_volume = data.arriving_volume[data.row_id == int(i)][data.column_id == int(j)].mean()
+                            departing_volume = data.departing_volume[data.row_id == int(i)][
+                                data.column_id == int(j)].mean()
+                            arriving_volume = data.arriving_volume[data.row_id == int(i)][
+                                data.column_id == int(j)].mean()
                             test_dict['id'].append(f'{i},' + f'{j}')
                             test_dict['departing_volume'].append(departing_volume)
                             test_dict['arriving_volume'].append(arriving_volume)
@@ -374,6 +376,7 @@ def show_data_statis(url, file):
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
+
 
 def form_statis_html(test_dict, asix_y, min_value, max_value, file):
     test_dict_df = pd.DataFrame(test_dict)

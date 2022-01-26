@@ -112,7 +112,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         fp.close()  # 关闭文件
         end = time.time()
         logger.info('上传文件初步处理运行时间: {} s；下面进行geojson文件的生成', end - start)
-        # 启动执行任务线程，使用json生成folium的html展示页面
+        # 启动执行任务线程，使用原子文件生成json
         ExecuteGeojsonThread(extract_path, file_name).start()
 
     def perform_destroy(self, instance):
@@ -148,7 +148,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
     @action(methods=['get'], detail=True)
     def generate_gis_view(self, request, *args, **kwargs):
         """
-        根据任务id获取geojson转化的gis图象地址
+        根据任务id和背景图号生成geojson转化的gis图象或者使用原子文件生成描述性可视化
         """
         # 生成geojson的json文件
         background_id = request.query_params.get('background')
