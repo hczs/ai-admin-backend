@@ -31,3 +31,4 @@ class DatasetStatusEnum(Enum):
     ERROR = -1
     SUCCESS = 2  # 用来表示完成html文件生成
     UN_PROCESS = 3
+    CHECK = 4  #  检查是否可以生成geojson

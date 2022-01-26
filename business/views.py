@@ -101,7 +101,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                     extract_without_folder(f, every, extract_path)
             zip_file.close()
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size,
-                        extract_path=extract_path, dataset_status=DatasetStatusEnum.ERROR.value)
+                        extract_path=extract_path, dataset_status=DatasetStatusEnum.CHECK.value)
         logger.info('文件上传完毕，文件名: ' + file_name)
         # 生成geojson的json文件
         url = settings.ADMIN_FRONT_HTML_PATH + 'homepage.html'  # 网页地址
