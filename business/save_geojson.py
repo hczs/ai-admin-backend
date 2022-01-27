@@ -11,6 +11,8 @@ from folium.plugins import HeatMap, MarkerCluster
 from business.enums import DatasetStatusEnum
 from common.utils import get_json_features
 from loguru import logger
+from sklearn import preprocessing
+import numpy as np
 
 
 def transfer_geo_json(url, file, background_id):
@@ -61,18 +63,38 @@ def make_map_double(_, heat, marker_cluster, tag1, tag2, mean_or_not=True):
     loc = location_str[1:]
     loc.append(loc1)
     heatmap = copy(loc)
-    heatmap.append(abs(_['properties'][tag1] - _['properties'][tag2]))
+    heatmap.append(abs(_['properties'][tag1] + _['properties'][tag2]))
     heat.append(heatmap)
     if mean_or_not:
         folium.Marker(
             location=loc,
-            popup='mean_net_' + tag1 + '=' + str(_['properties'][tag1] - _['properties'][tag2]),
+            popup=tag1 + '+' + tag2 + '='  + str(_['properties'][tag1] + _['properties'][tag2]),
         ).add_to(marker_cluster)
     else:
         folium.Marker(
             location=loc,
-            popup=tag1 + '-'+tag2 + '=' + str(_['properties'][tag1] - _['properties'][tag2]),
+            popup=tag1 + '+' + tag2 + '=' + str(_['properties'][tag1] + _['properties'][tag2]),
         ).add_to(marker_cluster)
+
+
+def make_heat(heat):
+    """
+    为热力图数据进行归一化处理
+    """
+    np_heat = np.array(heat[:])
+    heat_value = np_heat[:, -1]
+    i = 0
+    for item in heat_value:
+        heat_value[i] = abs(item)
+        i += 1
+    min_max_scaler = preprocessing.MinMaxScaler()
+    X_minMax = min_max_scaler.fit_transform(heat_value.reshape(-1, 1))
+    i = 0
+    for item in X_minMax:
+        np_heat[i, -1] = item[0]
+        i += 1
+    heat = np_heat.tolist()
+    return heat
 
 
 def show_geo_view(url, json_file, file, background_id):
@@ -129,31 +151,35 @@ def show_geo_view(url, json_file, file, background_id):
             if 'features_properties_traffic_speed' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, marker_cluster, tag='traffic_speed')
-                HeatMap(heat).add_to(m)
+                heat_minmax = make_heat(heat)
+                print(heat_minmax)
+                HeatMap(heat_minmax).add_to(m)
             elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
                 for _ in view_json['features']:
                     if _['geometry']['type'] == 'MultiPolygon':
                         pass
                     else:
                         make_map_double(_, heat, marker_cluster, tag1='inflow', tag2='outflow')
-                HeatMap(heat).add_to(m)
+                heat_minmax = make_heat(heat)
+                print(heat_minmax)
+                HeatMap(heat_minmax).add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_length' in feature_list:
                 for _ in view_json['features']:
-                    make_map_only(_,heat,marker_cluster,'length',mean_or_not=False)
+                    make_map_only(_, heat, marker_cluster, 'length', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_usr_id' in feature_list:
                 for _ in view_json['features']:
-                    make_map_only(_,heat,marker_cluster,'user_id',mean_or_not=False)
+                    make_map_only(_, heat, marker_cluster, 'user_id', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_highway' in feature_list:
                 for _ in view_json['features']:
-                    make_map_only(_,heat,marker_cluster,'highway',mean_or_not=False)
+                    make_map_only(_, heat, marker_cluster, 'highway', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             else:
                 property = str(feature_list[-1]).replace('features_properties_', '')
                 for _ in view_json['features']:
-                    make_map_only(_,heat,marker_cluster,property,mean_or_not=False)
+                    make_map_only(_, heat, marker_cluster, property, mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             # add data point to the mark cluster
             folium.LayerControl().add_to(m)
@@ -230,7 +256,7 @@ def make_statis_double(data, file, tag1, tag2, name, grid=False):
                 tag1_value = getattr(data, tag1)[data.entity_id == int(i)].mean()
                 tag2_value = getattr(data, tag2)[data.entity_id == int(i)].mean()
                 test_dict['id'].append(i)
-                test_dict[name].append(tag1_value - tag2_value)
+                test_dict[name].append(tag1_value + tag2_value)
                 pass
             form_statis_html(test_dict, name, min_value, max_value, file)
             file_view_status = DatasetStatusEnum.SUCCESS_stat.value
@@ -255,6 +281,7 @@ def make_statis_double(data, file, tag1, tag2, name, grid=False):
             file_view_status = DatasetStatusEnum.ERROR.value
     return file_view_status
 
+
 def show_data_statis(url, file):
     """
     如果无法展示其地理图象则将其描述性统计数据展示
@@ -265,22 +292,22 @@ def show_data_statis(url, file):
             logger.info('尝试绘制' + files + '文件的[dyna]统计图象')
             data = pd.read_csv(settings.DATASET_PATH + file + os.sep + files, index_col='dyna_id')
             if 'traffic_flow' in data:
-                file_view_status = make_statis_only(data, file, tag='traffic_flow', name='net_traffic_flow')
+                file_view_status = make_statis_only(data, file, tag='traffic_flow', name='abs_traffic_flow')
                 return file_view_status
             elif 'in_flow' in data and 'out_flow' in data:
-                file_view_status = make_statis_double(data, file,'in_flow', 'out_flow', 'net_flow')
+                file_view_status = make_statis_double(data, file, 'in_flow', 'out_flow', 'abs_flow')
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'net_flow')
+                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'abs_flow')
                 return file_view_status
             elif 'pickup' in data and 'dropoff' in data:
-                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'net_quantity')
+                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'abs_quantity')
                 return file_view_status
             elif 'traffic_speed' in data:
-                file_view_status = make_statis_only(data, file, tag='traffic_speed', name='mean_traffic_speed')
+                file_view_status = make_statis_only(data, file, tag='traffic_speed', name='traffic_speed')
                 return file_view_status
             elif 'traffic_intensity' in data:
-                file_view_status = make_statis_only(data, file, tag='traffic_intensity', name='mean_traffic_intensity')
+                file_view_status = make_statis_only(data, file, tag='traffic_intensity', name='traffic_intensity')
                 return file_view_status
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
@@ -288,18 +315,19 @@ def show_data_statis(url, file):
         if files.count('grid') > 0:
             logger.info('尝试绘制' + files + '文件的[grid]统计图象')
             data = pd.read_csv(settings.DATASET_PATH + file + '/' + files, index_col='dyna_id')
-            # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'net_flow': []}
+            # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
             if 'risk' in data:
-                file_view_status = make_statis_only(data, file, tag='risk', name='risk',grid=True)
+                file_view_status = make_statis_only(data, file, tag='risk', name='risk', grid=True)
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'net_flow',grid=True)
+                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'abs_flow', grid=True)
                 return file_view_status
             elif 'pickup' in data and 'dropoff' in data:
-                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'net_quantity', grid=True)
+                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'abs_quantity', grid=True)
                 return file_view_status
             elif 'departing_volume' in data and 'arriving_volume' in data:
-                file_view_status = make_statis_double(data, file, 'pickup', 'arriving_volume', 'mean_net_volume', grid=True)
+                file_view_status = make_statis_double(data, file, 'departing_volume', 'arriving_volume', 'abs_volume',
+                                                      grid=True)
                 return file_view_status
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
