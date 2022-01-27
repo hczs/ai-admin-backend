@@ -57,21 +57,21 @@ class Task(BaseModel):
 
 
 class TrafficStatePredAndEta(models.Model):
-    MAE = models.CharField(max_length=30)
-    MAPE = models.CharField(max_length=30)
-    MSE = models.CharField(max_length=30)
-    RMSE = models.CharField(max_length=30)
-    masked_MAE = models.CharField(max_length=30)
-    masked_MAPE = models.CharField(max_length=30)
-    masked_MSE = models.CharField(max_length=30)
-    masked_RMSE = models.CharField(max_length=30)
-    R2 = models.CharField(max_length=30)
-    EVAR = models.CharField(max_length=30)
-    Precision = models.CharField(max_length=30)
-    Recall = models.CharField(max_length=30)
-    F1_Score = models.CharField(max_length=30)
-    MAP = models.CharField(max_length=30)
-    PCC = models.CharField(max_length=30)
+    MAE = models.CharField(max_length=30, null=True)
+    MAPE = models.CharField(max_length=30, null=True)
+    MSE = models.CharField(max_length=30, null=True)
+    RMSE = models.CharField(max_length=30, null=True)
+    masked_MAE = models.CharField(max_length=30, null=True)
+    masked_MAPE = models.CharField(max_length=30, null=True)
+    masked_MSE = models.CharField(max_length=30, null=True)
+    masked_RMSE = models.CharField(max_length=30, null=True)
+    R2 = models.CharField(max_length=30, null=True)
+    EVAR = models.CharField(max_length=30, null=True)
+    Precision = models.CharField(max_length=30, null=True)
+    Recall = models.CharField(max_length=30, null=True)
+    F1_Score = models.CharField(max_length=30, null=True)
+    MAP = models.CharField(max_length=30, null=True)
+    PCC = models.CharField(max_length=30, null=True)
     task = models.ForeignKey(Task, db_constraint=False, on_delete=models.CASCADE)
 
     class Meta:
@@ -81,9 +81,9 @@ class TrafficStatePredAndEta(models.Model):
 
 
 class MapMatching(models.Model):
-    RMF = models.CharField(max_length=30)
-    AN = models.CharField(max_length=30)
-    AL = models.CharField(max_length=30)
+    RMF = models.CharField(max_length=30, null=True)
+    AN = models.CharField(max_length=30, null=True)
+    AL = models.CharField(max_length=30, null=True)
     task = models.ForeignKey(Task, db_constraint=False, on_delete=models.CASCADE)
 
     class Meta:
@@ -93,7 +93,12 @@ class MapMatching(models.Model):
 
 
 class TrajLocPred(models.Model):
-    Recall = models.CharField(max_length=30)
+    Recall = models.CharField(max_length=30, null=True)
+    Precision = models.CharField(max_length=30, null=True)
+    F1 = models.CharField(max_length=30, null=True)
+    MRR = models.CharField(max_length=30, null=True)
+    MAP = models.CharField(max_length=30, null=True)
+    NDCG = models.CharField(max_length=30, null=True)
     task = models.ForeignKey(Task, db_constraint=False, on_delete=models.CASCADE)
 
     class Meta:
