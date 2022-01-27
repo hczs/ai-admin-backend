@@ -130,6 +130,15 @@ def parentheses_escape(raw_string):
     return raw_string.replace('(', '\\(').replace(')', '\\)')
 
 
+def str_is_empty(raw_string):
+    """
+    判断字符串是否为空
+    :param raw_string: 字符串
+    :return: 是否为空
+    """
+    return raw_string is None or raw_string == ''
+
+
 def query_type(data):
     for ch in data:
         if ch == '{':
