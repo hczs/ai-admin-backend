@@ -30,6 +30,6 @@ class DatasetStatusEnum(Enum):
     PROCESSING = 0
     PROCESSING_COMPLETE = 1  # 用来表示完成geojson文件生成
     SUCCESS = 2  # 用来表示完成html文件生成
-    UN_PROCESS = 3
-    CHECK = 4  #  检查是否可以生成geojson
+    UN_PROCESS = 3  # 已经生成geojson但是没有进行可视化处理
+    CHECK = 4  # 正在生成geojson（检查是否可以进行可视化处理）
     SUCCESS_stat = 5  # 用来表示完成html文件生成
