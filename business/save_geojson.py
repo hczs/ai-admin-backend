@@ -35,7 +35,50 @@ def transfer_geo_json(url, file, background_id):
             return file_view_status
 
 
+def make_map_only(_, heat, marker_cluster, tag, mean_or_not=True):
+    location_str = return_location(_)
+    loc1 = location_str[0]
+    loc = location_str[1:]
+    loc.append(loc1)
+    heatmap = copy(loc)
+    heatmap.append(_['properties'][tag])
+    heat.append(heatmap)
+    if mean_or_not:
+        folium.Marker(
+            location=loc,
+            popup='mean ' + tag + '=' + str(_['properties'][tag]),
+        ).add_to(marker_cluster)
+    else:
+        folium.Marker(
+            location=loc,
+            popup=tag + '=' + str(_['properties'][tag]),
+        ).add_to(marker_cluster)
+
+
+def make_map_double(_, heat, marker_cluster, tag1, tag2, mean_or_not=True):
+    location_str = return_location(_)
+    loc1 = location_str[0]
+    loc = location_str[1:]
+    loc.append(loc1)
+    heatmap = copy(loc)
+    heatmap.append(abs(_['properties'][tag1] - _['properties'][tag2]))
+    heat.append(heatmap)
+    if mean_or_not:
+        folium.Marker(
+            location=loc,
+            popup='mean_net_' + tag1 + '=' + str(_['properties'][tag1] - _['properties'][tag2]),
+        ).add_to(marker_cluster)
+    else:
+        folium.Marker(
+            location=loc,
+            popup=tag1 + '-'+tag2 + '=' + str(_['properties'][tag1] - _['properties'][tag2]),
+        ).add_to(marker_cluster)
+
+
 def show_geo_view(url, json_file, file, background_id):
+    """
+    解析json文件并按照不同的展示规则进行展示
+    """
     geo_layer = f"{url}" + os.sep + f"{json_file}"
     view_json = json.load(open(geo_layer, 'r'))
     _ = view_json['features'][0]
@@ -82,85 +125,35 @@ def show_geo_view(url, json_file, file, background_id):
             #   features_properties_length
             #   features_properties_highway
             #   features_properties_usr_id
+            #   (last property in list)
             if 'features_properties_traffic_speed' in feature_list:
                 for _ in view_json['features']:
-                    location_str = return_location(_)
-                    loc1 = location_str[0]
-                    loc = location_str[1:]
-                    loc.append(loc1)
-                    heatmap = copy(loc)
-                    heatmap.append(_['properties']['traffic_speed'])
-                    heat.append(heatmap)
-                    folium.Marker(
-                        location=loc,
-                        popup='mean_traffic_speed=' + str(_['properties']['traffic_speed']),
-                    ).add_to(marker_cluster)
+                    make_map_only(_, heat, marker_cluster, tag='traffic_speed')
                 HeatMap(heat).add_to(m)
             elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
                 for _ in view_json['features']:
                     if _['geometry']['type'] == 'MultiPolygon':
                         pass
                     else:
-                        location_str = return_location(_)
-                        loc1 = location_str[0]
-                        loc = location_str[1:]
-                        loc.append(loc1)
-                        heatmap = copy(loc)
-                        heatmap.append(abs(_['properties']['inflow'] - _['properties']['outflow']))
-                        heat.append(heatmap)
-                        folium.Marker(
-                            location=loc,
-                            popup='mean_net_flow=' + str(_['properties']['inflow'] - _['properties']['outflow']),
-                        ).add_to(marker_cluster)
+                        make_map_double(_, heat, marker_cluster, tag1='inflow', tag2='outflow')
                 HeatMap(heat).add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_length' in feature_list:
                 for _ in view_json['features']:
-                    location_str = return_location(_)
-                    loc1 = location_str[0]
-                    loc = location_str[1:]
-                    loc.append(loc1)
-                    folium.Marker(
-                        location=loc,
-                        popup='length=' + str(_['properties']['length']),
-                    ).add_to(marker_cluster)
+                    make_map_only(_,heat,marker_cluster,'length',mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_usr_id' in feature_list:
-                location_str = return_location(_)
-                loc1 = location_str[0]
-                loc = location_str[1:]
-                loc.append(loc1)
-                folium.Marker(
-                    location=loc,
-                    popup='user_id=' + str(_['properties']['usr_id']),
-                    color='crimson',
-                    fill=False,
-                ).add_to(m)
+                for _ in view_json['features']:
+                    make_map_only(_,heat,marker_cluster,'user_id',mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_highway' in feature_list:
-                location_str = return_location(_)
-                loc1 = location_str[0]
-                loc = location_str[1:]
-                loc.append(loc1)
-                folium.Marker(
-                    location=loc,
-                    popup='highway=' + str(_['properties']['highway']),
-                    color='crimson',
-                    fill=False,
-                ).add_to(m)
+                for _ in view_json['features']:
+                    make_map_only(_,heat,marker_cluster,'highway',mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             else:
                 property = str(feature_list[-1]).replace('features_properties_', '')
-                location_str = return_location(_)
-                loc1 = location_str[0]
-                loc = location_str[1:]
-                loc.append(loc1)
-                folium.Marker(
-                    location=loc,
-                    popup='property=' + str(_['properties'][f"{property}"]),
-                    color='crimson',
-                    fill=False,
-                ).add_to(m)
+                for _ in view_json['features']:
+                    make_map_only(_,heat,marker_cluster,property,mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             # add data point to the mark cluster
             folium.LayerControl().add_to(m)
@@ -176,6 +169,9 @@ def show_geo_view(url, json_file, file, background_id):
 
 
 def return_location(block):
+    """
+    获取一个feature的geometry-coordinates内容并按照它是点线面来返回其定位坐标点
+    """
     location = None
     if len(block['geometry']['coordinates']) > 0:
         if type(block['geometry']['coordinates'][0]) is not list:
@@ -188,104 +184,103 @@ def return_location(block):
     return location
 
 
+def make_statis_only(data, file, tag, name, grid=False):
+    """
+    利用只有一个参数，获取统计图象
+    """
+    if not grid:
+        try:
+            min_value = data.entity_id.min()
+            max_value = data.entity_id.max()
+            test_dict = {'id': [], name: []}
+            for i in data.entity_id.unique():
+                tag_value = getattr(data, tag)[data.entity_id == int(i)].mean()
+                test_dict['id'].append(i)
+                test_dict[name].append(tag_value)
+                pass
+            form_statis_html(test_dict, name, min_value, max_value, file)
+            file_view_status = DatasetStatusEnum.SUCCESS_stat.value
+        except Exception:
+            file_view_status = DatasetStatusEnum.ERROR.value
+    else:
+        try:
+            test_dict = {'id': [], name: []}
+            page_legth = 0
+            for i in data.row_id.unique():
+                for j in data.column_id.unique():
+                    page_legth += 1
+                    tag_value = getattr(data, tag)[data.row_id == int(i)][data.column_id == int(j)].mean()
+                    test_dict['id'].append(f"{i}" + f", {j}")
+                    test_dict[name].append(tag_value)
+            form_long_statis_html(test_dict, name, page_legth, file)
+            file_view_status = DatasetStatusEnum.SUCCESS_stat.value
+            logger.info('统计图象绘制完成')
+        except Exception:
+            file_view_status = DatasetStatusEnum.ERROR.value
+    return file_view_status
+
+
+def make_statis_double(data, file, tag1, tag2, name, grid=False):
+    if not grid:
+        try:
+            min_value = data.entity_id.min()
+            max_value = data.entity_id.max()
+            test_dict = {'id': [], name: []}
+            for i in data.entity_id.unique():
+                tag1_value = getattr(data, tag1)[data.entity_id == int(i)].mean()
+                tag2_value = getattr(data, tag2)[data.entity_id == int(i)].mean()
+                test_dict['id'].append(i)
+                test_dict[name].append(tag1_value - tag2_value)
+                pass
+            form_statis_html(test_dict, name, min_value, max_value, file)
+            file_view_status = DatasetStatusEnum.SUCCESS_stat.value
+        except Exception:
+            file_view_status = DatasetStatusEnum.ERROR.value
+    else:
+        try:
+            test_dict = {'id': [], name: []}
+            page_legth = 0
+            for i in data.row_id.unique():
+                for j in data.column_id.unique():
+                    page_legth += 1
+                    tag1_value = getattr(data, tag1)[data.row_id == int(i)][data.column_id == int(j)].mean()
+                    tag2_value = getattr(data, tag2)[data.row_id == int(i)][data.column_id == int(j)].mean()
+                    test_dict['id'].append(f'{i},' + f'{j}')
+                    test_dict[name].append(tag1_value - tag2_value)
+                    pass
+            form_long_statis_html(test_dict, name, page_legth, file)
+            file_view_status = DatasetStatusEnum.SUCCESS_stat.value
+            logger.info('统计图象绘制完成')
+        except Exception:
+            file_view_status = DatasetStatusEnum.ERROR.value
+    return file_view_status
+
 def show_data_statis(url, file):
+    """
+    如果无法展示其地理图象则将其描述性统计数据展示
+    """
     file_path = url.replace('_geo_json', '')
     for files in os.listdir(file_path):
         if files.count('dyna') > 0:
             logger.info('尝试绘制' + files + '文件的[dyna]统计图象')
             data = pd.read_csv(settings.DATASET_PATH + file + os.sep + files, index_col='dyna_id')
             if 'traffic_flow' in data:
-                try:
-                    min_value = data.entity_id.min()
-                    max_value = data.entity_id.max()
-                    test_dict = {'id': [], 'net_flow': []}
-                    for i in data.entity_id.unique():
-                        net_flow = data.traffic_flow[data.entity_id == int(i)].mean()
-                        test_dict['id'].append(i)
-                        test_dict['net_flow'].append(net_flow)
-                        pass
-                    form_statis_html(test_dict, 'net_flow', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_only(data, file, tag='traffic_flow', name='net_traffic_flow')
                 return file_view_status
             elif 'in_flow' in data and 'out_flow' in data:
-                try:
-                    min_value = data.entity_id.min()
-                    max_value = data.entity_id.max()
-                    test_dict = {'id': [], 'net_flow': []}
-                    for i in data.entity_id.unique():
-                        inflow = data.in_flow[data.entity_id == int(i)].mean()
-                        outflow = data.out_flow[data.entity_id == int(i)].mean()
-                        test_dict['id'].append(i)
-                        test_dict['net_flow'].append(inflow - outflow)
-                        pass
-                    form_statis_html(test_dict, 'net_flow', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_double(data, file,'in_flow', 'out_flow', 'net_flow')
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                try:
-                    min_value = data.entity_id.min()
-                    max_value = data.entity_id.max()
-                    test_dict = {'id': [], 'net_flow': []}
-                    for i in data.entity_id.unique():
-                        inflow = data.inflow[data.entity_id == int(i)].mean()
-                        outflow = data.outflow[data.entity_id == int(i)].mean()
-                        test_dict['id'].append(i)
-                        test_dict['net_flow'].append(inflow - outflow)
-                        pass
-                    form_statis_html(test_dict, 'net_flow', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'net_flow')
                 return file_view_status
             elif 'pickup' in data and 'dropoff' in data:
-                try:
-                    min_value = data.entity_id.min()
-                    max_value = data.entity_id.max()
-                    test_dict = {'id': [], 'net_quantity': []}
-                    for i in data.entity_id.unique():
-                        pickup = data.pickup[data.entity_id == int(i)].mean()
-                        dropoff = data.dropoff[data.entity_id == int(i)].mean()
-                        test_dict['id'].append(i)
-                        test_dict['net_flow'].append(pickup - dropoff)
-                        pass
-                    form_statis_html(test_dict, 'net_quantity', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'net_quantity')
                 return file_view_status
             elif 'traffic_speed' in data:
-                try:
-                    min_value = data.entity_id.min()
-                    max_value = data.entity_id.max()
-                    test_dict = {'id': [], 'traffic_speed': []}
-                    for i in data.entity_id.unique():
-                        net_flow = data.traffic_speed[data.entity_id == int(i)].mean()
-                        test_dict['id'].append(i)
-                        test_dict['traffic_speed'].append(net_flow)
-                        pass
-                    form_statis_html(test_dict, 'traffic_speed', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_only(data, file, tag='traffic_speed', name='mean_traffic_speed')
                 return file_view_status
             elif 'traffic_intensity' in data:
-                try:
-                    min_value = data.entity_id.min()
-                    max_value = data.entity_id.max()
-                    test_dict = {'id': [], 'traffic_intensity': []}
-                    for i in data.entity_id.unique():
-                        net_flow = data.traffic_intensity[data.entity_id == int(i)].mean()
-                        test_dict['id'].append(i)
-                        test_dict['traffic_intensity'].append(net_flow)
-                        pass
-                    form_statis_html(test_dict, 'traffic_intensity', min_value, max_value, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_only(data, file, tag='traffic_intensity', name='mean_traffic_intensity')
                 return file_view_status
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
@@ -295,90 +290,26 @@ def show_data_statis(url, file):
             data = pd.read_csv(settings.DATASET_PATH + file + '/' + files, index_col='dyna_id')
             # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'net_flow': []}
             if 'risk' in data:
-                try:
-                    test_dict = {'id': [], 'risk': []}
-                    page_legth = 0
-                    for i in data.row_id.unique():
-                        for j in data.column_id.unique():
-                            page_legth += 1
-                            risk = data.risk[data.row_id == int(i)][data.column_id == int(j)].mean()
-                            test_dict['id'].append(f"{i}" + f", {j}")
-                            test_dict['risk'].append(risk)
-                    form_long_statis_html(test_dict, 'risk', page_legth, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                    logger.info('统计图象绘制完成')
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_only(data, file, tag='risk', name='risk',grid=True)
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                try:
-                    test_dict = {'id': [], 'inflow': [], 'outflow': [], 'net_flow': []}
-                    page_legth = 0
-                    for i in data.row_id.unique():
-                        for j in data.column_id.unique():
-                            page_legth += 1
-                            inflow = data.inflow[data.row_id == int(i)][data.column_id == int(j)].mean()
-                            outflow = data.outflow[data.row_id == int(i)][data.column_id == int(j)].mean()
-                            test_dict['id'].append(f'{i},' + f'{j}')
-                            test_dict['inflow'].append(inflow)
-                            test_dict['outflow'].append(outflow)
-                            test_dict['net_flow'].append(inflow - outflow)
-                            pass
-                    form_long_statis_html(test_dict, 'net_flow', page_legth, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                    logger.info('统计图象绘制完成')
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'net_flow',grid=True)
                 return file_view_status
             elif 'pickup' in data and 'dropoff' in data:
-                try:
-                    test_dict = {'id': [], 'pickup': [], 'dropoff': [], 'net_quantity': []}
-                    page_legth = 0
-                    for i in data.row_id.unique():
-                        for j in data.column_id.unique():
-                            page_legth += 1
-                            pickup = data.pickup[data.row_id == int(i)][data.column_id == int(j)].mean()
-                            dropoff = data.dropoff[data.row_id == int(i)][data.column_id == int(j)].mean()
-                            test_dict['id'].append(f'{i},' + f'{j}')
-                            test_dict['pickup'].append(pickup)
-                            test_dict['dropoff'].append(dropoff)
-                            test_dict['net_quantity'].append(pickup - dropoff)
-                            pass
-                    form_long_statis_html(test_dict, 'net_quantity', page_legth, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                    logger.info('统计图象绘制完成')
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'net_quantity', grid=True)
                 return file_view_status
             elif 'departing_volume' in data and 'arriving_volume' in data:
-                try:
-                    test_dict = {'id': [], 'departing_volume': [], 'arriving_volume': [], 'net_departing_volume': []}
-                    page_legth = 0
-                    for i in data.row_id.unique():
-                        for j in data.column_id.unique():
-                            page_legth += 1
-                            departing_volume = data.departing_volume[data.row_id == int(i)][
-                                data.column_id == int(j)].mean()
-                            arriving_volume = data.arriving_volume[data.row_id == int(i)][
-                                data.column_id == int(j)].mean()
-                            test_dict['id'].append(f'{i},' + f'{j}')
-                            test_dict['departing_volume'].append(departing_volume)
-                            test_dict['arriving_volume'].append(arriving_volume)
-                            test_dict['net_departing_volume'].append(departing_volume - arriving_volume)
-                            pass
-                    form_long_statis_html(test_dict, 'net_departing_volume', page_legth, file)
-                    file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-                    logger.info('统计图象绘制完成')
-                except Exception:
-                    file_view_status = DatasetStatusEnum.ERROR.value
+                file_view_status = make_statis_double(data, file, 'pickup', 'arriving_volume', 'mean_net_volume', grid=True)
                 return file_view_status
-
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
                 return file_view_status
 
 
 def form_statis_html(test_dict, asix_y, min_value, max_value, file):
+    """
+    根据统计数据形成一个固定宽度的html页面
+    """
     test_dict_df = pd.DataFrame(test_dict)
     chart = alt.Chart(test_dict_df, title='Mean of ' + f"{asix_y}" + ' on timeseries').mark_point().encode(
         x=alt.X('id', scale=alt.Scale(domain=[min_value, max_value])),
@@ -390,6 +321,9 @@ def form_statis_html(test_dict, asix_y, min_value, max_value, file):
 
 
 def form_long_statis_html(test_dict, asix_y, page_legth, file):
+    """
+    根据统计数据形成一个可变宽度的html页面
+    """
     test_dict_df = pd.DataFrame(test_dict)
     interval = alt.selection_interval()
     chart = alt.Chart(test_dict_df, title='Mean of ' + f"{asix_y}" + ' on timeseries').mark_point().encode(
@@ -627,6 +561,9 @@ def ensure_dir(dir_path):
 
 
 def get_geo_json(dataset, save_path):
+    """
+    生成geojson文件
+    """
     try:
         helper = VisHelper(dataset, save_path)
         file_form_status = helper.visualize()
