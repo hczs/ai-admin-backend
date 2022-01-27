@@ -170,7 +170,7 @@ def show_geo_view(url, json_file, file, background_id):
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_usr_id' in feature_list:
                 for _ in view_json['features']:
-                    make_map_only(_, heat, marker_cluster, 'user_id', mean_or_not=False)
+                    make_map_only(_, heat, marker_cluster, 'usr_id', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_highway' in feature_list:
                 for _ in view_json['features']:
