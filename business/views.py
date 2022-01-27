@@ -241,6 +241,7 @@ class TaskViewSet(ModelViewSet):
             if param_value is not None:
                 if param == 'config_file':
                     path, param_value = os.path.split(param_value)
+                    param_value = os.path.splitext(param_value)[0]
                 str_command += ' --' + param + ' ' + str(param_value)
         # 检查任务是否已经加入过队列中，如果已经存在，把之前的移除，以本次提交为准
         if task_is_exists(str(task.id)):
