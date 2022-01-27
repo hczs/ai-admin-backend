@@ -32,7 +32,7 @@ from business.evaluate import evaluate_insert
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
 from business.threads import ExecuteCommandThread, ExecuteGeojsonThread, ExecuteGeoViewThread
 from common.response import PassthroughRenderer
-from common.utils import read_file_str, generate_download_file
+from common.utils import read_file_str, generate_download_file, str_is_empty
 from bs4 import BeautifulSoup
 
 
@@ -369,11 +369,12 @@ class TrafficStateEtaViewSet(ModelViewSet):
             if tasks is not None and evaluates is not None:
                 # 根据task的模型名分组
                 for task in tasks:
-                    model_evaluate[task.model] = []
+                    key = task.model + '-' + task.task_name
+                    model_evaluate[key] = []
                     # 此处evaluates长度为1，就一条数据
                     for evaluate in evaluates:
                         if evaluate.task_id == task.id:
-                            model_evaluate[task.model] = evaluate
+                            model_evaluate[key] = evaluate
             # x轴数据，以模型为x轴
             xdata = list(model_evaluate.keys())
             # 响应结果数据
@@ -385,7 +386,7 @@ class TrafficStateEtaViewSet(ModelViewSet):
                 if evaluates[0].__dict__.get(evaluate_name) is None or evaluates[0].__dict__.get(evaluate_name) == '' \
                         or evaluate_name == '_state' or evaluate_name == 'id' or evaluate_name == 'task_id':
                     continue
-                tmp_data = {'id': str(count), 'evaluate_name': evaluate_name, 'xdata': xdata, 'data': []}
+                tmp_data = {'id': str(count), 'evaluate_name': evaluate_name, 'xdata': [], 'data': []}
                 # 添加折线图数据
                 # line_data = {'type': 'line', 'data': []}
                 # 添加柱形图数据 默认只加柱形图数据
@@ -396,7 +397,10 @@ class TrafficStateEtaViewSet(ModelViewSet):
                     if value == 'inf':
                         is_inf = True
                         break
+                    if str_is_empty(value):
+                        break
                     # line_data['data'].append(value)
+                    tmp_data['xdata'].append(x)
                     bar_data['data'].append(value)
                 # tmp_data['data'].append(line_data)
                 tmp_data['data'].append(bar_data)
@@ -435,17 +439,18 @@ class TrafficStateEtaViewSet(ModelViewSet):
             tasks = Task.objects.filter(id__in=task_ids).all()
             evaluates = TrafficStatePredAndEta.objects.filter(task_id__in=task_ids).all()
             task_evaluates = {}
-            # 根据task的模型名分组
+            # 根据task的模型名分组 key：模型名 value：指标list
             for task in tasks:
-                task_evaluates[task.model] = []
+                key = task.model + '-' + task.task_name
+                task_evaluates[key] = []
                 for evaluate in evaluates:
                     if evaluate.task_id == task.id:
-                        task_evaluates[task.model].append(evaluate)
+                        task_evaluates[key].append(evaluate)
             # 获取所有模型名list
             legend = list(task_evaluates.keys())
             # 构造xdata
             xdata = []
-            for i in range(1, len(task_evaluates.get(tasks[0].model)) + 1):
+            for i in range(1, len(task_evaluates.get(tasks[0].model + '-' + tasks[0].task_name)) + 1):
                 xdata.append(i)
             # 响应结果数据
             result_data = []
@@ -453,28 +458,38 @@ class TrafficStateEtaViewSet(ModelViewSet):
             # 构造每个指标的折线图数据
             for evaluate_name in evaluates[0].__dict__:
                 is_inf = False
-                if evaluates[0].__dict__.get(evaluate_name) is None or evaluates[0].__dict__.get(evaluate_name) == '' \
-                        or evaluate_name == '_state' or evaluate_name == 'id' or evaluate_name == 'task_id':
+                if evaluate_name == '_state' or evaluate_name == 'id' or evaluate_name == 'task_id':
                     continue
-                tmp_data = {'id': str(count), 'evaluate_name': evaluate_name, 'legend':
-                    legend, 'xdata': xdata, 'data': []}
+                tmp_data = {'id': str(count), 'evaluate_name': evaluate_name, 'legend': [], 'xdata': xdata,
+                            'data': []}
                 for task_model in task_evaluates:
+                    model_is_null = False
                     model_data = {'name': task_model, 'type': 'line', 'data': []}
                     for evaluate in task_evaluates.get(task_model):
-                        # 存在inf值的数据不做返回展示
+                        # 存在inf值的数据不做返回展示，就不要这个tmp_data了
                         if evaluate.__dict__.get(evaluate_name) == 'inf':
                             is_inf = True
                             break
+                        # 获取具体指标值，为空的不参加比较，就不要这个model_data了
+                        if str_is_empty(evaluate.__dict__.get(evaluate_name)):
+                            model_is_null = True
+                            break
                         model_data['data'].append(evaluate.__dict__.get(evaluate_name))
-                    tmp_data['data'].append(model_data)
+                    if not model_is_null:
+                        tmp_data['data'].append(model_data)
                 if not is_inf:
-                    result_data.append(tmp_data)  # 只加入不存在inf值的tmp_data
+                    # 整理tmp_data的legend
+                    for item in tmp_data['data']:
+                        tmp_data['legend'].append(item['name'])
+                    # 如果发现legend为空，就代表这个指标下，所有模型都没有数据，所以也就没必要展示了
+                    if not tmp_data['legend'] == []:
+                        result_data.append(tmp_data)  # 只加入不存在inf值的tmp_data
                 count = count + 1
             return Response(data=result_data, status=status.HTTP_200_OK)
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        # 返回的是result_data的list，一个指标对应一个result_data
-        # result_data = {
+        # 返回的是tmp_data的list，一个指标对应一个tmp_data
+        # tmp_data = {
         #     "evaluate_name": "召回率",
         #     "legend": ['GRU', 'RNN'],
         #     "xdata": [1, 3, 5, 6, 8],
