@@ -196,6 +196,18 @@ class TaskViewSet(ModelViewSet):
         else:
             return Response(data={'detail': '任务未开始！'}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['get'], detail=True)
+    def get_config(self, *args, **kwargs):
+        """
+        获取指定任务的配置文件信息
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        task = self.get_object()
+        config_content = read_file_str(task.config_file)
+        return Response(config_content, status=status.HTTP_200_OK)
+
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=True)
     def download_log(self, *args, **kwargs):
@@ -312,6 +324,15 @@ class TaskViewSet(ModelViewSet):
         参数配置文件样例文件下载
         """
         return generate_download_file(settings.TASK_PARAM_EXAMPLE_PATH)
+
+    @renderer_classes((PassthroughRenderer,))
+    @action(methods=['get'], detail=True)
+    def download_task_config(self, request, *args, **kwargs):
+        """
+        指定任务配置文件下载
+        """
+        task = self.get_object()
+        return generate_download_file(task.config_file)
 
     @action(methods=['get'], detail=True)
     def get_result(self, request, *args, **kwargs):
