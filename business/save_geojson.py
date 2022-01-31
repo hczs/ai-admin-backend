@@ -68,7 +68,7 @@ def make_map_double(_, heat, marker_cluster, tag1, tag2, mean_or_not=True):
     if mean_or_not:
         folium.Marker(
             location=loc,
-            popup=tag1 + '+' + tag2 + '='  + str(_['properties'][tag1] + _['properties'][tag2]),
+            popup=tag1 + '+' + tag2 + '=' + str(_['properties'][tag1] + _['properties'][tag2]),
         ).add_to(marker_cluster)
     else:
         folium.Marker(
@@ -95,6 +95,62 @@ def make_heat(heat):
         i += 1
     heat = np_heat.tolist()
     return heat
+
+
+def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
+    csv_raw_data = []
+    if tag2 is None:
+        tag_name = tag1
+        i=0
+        for _ in view_json['features']:
+            geo_id = _['properties']['geo_id']
+            tag_value = _['properties'][tag1]
+            csv_raw_data.append([geo_id, tag_value])
+            i += 1
+    else:
+        tag_name = 'sum_'+tag1+'_'+tag2
+        i = 0
+        for _ in view_json['features']:
+            geo_id = _['properties']['geo_id']
+            tag_value = _['properties'][tag1]+_['properties'][tag2]
+            csv_raw_data.append([geo_id, tag_value])
+            i += 1
+    csv_column_name = ['geo_id', tag_name]
+    csv_pd = pd.DataFrame(columns=csv_column_name,data=csv_raw_data)
+    csv_path = f"{url}" + os.sep + f"{file}" + '.csv'
+    csv_pd.to_csv(csv_path,index=False)
+    print(csv_path)
+    return csv_path
+
+
+def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None):
+    Choropleth_data = pd.read_csv(csv_url)
+    if tag2 is None:
+        print('choose 1')
+        folium.Choropleth(
+            geo_data=state_geo,
+            name="choropleth",
+            data=Choropleth_data,
+            columns=["geo_id", tag1],
+            key_on="feature.id",
+            fill_color="YlGn",
+            fill_opacity=0.7,
+            line_opacity=0.2,
+            legend_name="Unemployment Rate (%)",
+        ).add_to(m)
+    else:
+        print('choose 2')
+        folium.Choropleth(
+            geo_data=state_geo,
+            name="choropleth",
+            data=Choropleth_data,
+            columns=["geo_id", 'sum_'+tag1+'_'+tag2],
+            key_on="feature.id",
+            fill_color="YlGn",
+            fill_opacity=0.7,
+            line_opacity=0.2,
+            legend_name='sum_'+tag1+'_'+tag2,
+        ).add_to(m)
 
 
 def show_geo_view(url, json_file, file, background_id):
@@ -152,7 +208,6 @@ def show_geo_view(url, json_file, file, background_id):
                 for _ in view_json['features']:
                     make_map_only(_, heat, marker_cluster, tag='traffic_speed')
                 heat_minmax = make_heat(heat)
-                print(heat_minmax)
                 HeatMap(heat_minmax).add_to(m)
             elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
                 for _ in view_json['features']:
@@ -162,11 +217,17 @@ def show_geo_view(url, json_file, file, background_id):
                         make_map_double(_, heat, marker_cluster, tag1='inflow', tag2='outflow')
                 heat_minmax = make_heat(heat)
                 print(heat_minmax)
+                csv_url = make_Choropleth_csv(view_json, file, url, tag1='inflow',tag2='outflow')
+                add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow',tag2='outflow')
                 HeatMap(heat_minmax).add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_length' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, marker_cluster, 'length', mean_or_not=False)
+                folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+            elif 'features_properties_traj_id' in feature_list:
+                for _ in view_json['features']:
+                    make_map_only(_, heat, marker_cluster, 'traj_id', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_usr_id' in feature_list:
                 for _ in view_json['features']:
@@ -396,7 +457,7 @@ class VisHelper:
                 if file.split('.')[1] == 'grid':
                     self.grid_file.append(file)
 
-            assert len(self.geo_file) == 1
+            # assert len(self.geo_file) == 1
 
             # reserved columns
             self.geo_reserved_lst = ['type', 'coordinates']
@@ -407,10 +468,13 @@ class VisHelper:
 
     def visualize(self):
         try:
-            if self.type == 'trajectory':
+            if self.type == 'trajectory' or 'traj':
                 # geo
-                self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
-                self._visualize_geo()
+                try:
+                    self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
+                    # self._visualize_geo()
+                except Exception:
+                    pass
                 # dyna
                 for dyna_file in self.dyna_file:
                     self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
@@ -451,6 +515,7 @@ class VisHelper:
             # form a feature
             feature_i = dict()
             feature_i['type'] = 'Feature'
+            feature_i['id'] = geo_id
             feature_i['properties'] = feature_dct
             feature_i['geometry'] = {}
             feature_i['geometry']['type'] = row['type']
@@ -475,6 +540,7 @@ class VisHelper:
         for _, row in geo_file.iterrows():
 
             # get feature dictionary
+            geo_id = row['geo_id']
             row_id, column_id = row['row_id'], row['column_id']
             feature_dct = row[geo_feature_lst].to_dict()
             dyna_i = grid_file[(grid_file['row_id'] == row_id) & (grid_file['column_id'] == column_id)]
@@ -484,6 +550,7 @@ class VisHelper:
             # form a feature
             feature_i = dict()
             feature_i['type'] = 'Feature'
+            feature_i['id'] = geo_id
             feature_i['properties'] = feature_dct
             feature_i['geometry'] = {}
             feature_i['geometry']['type'] = row['type']
@@ -501,9 +568,11 @@ class VisHelper:
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         extra_feature = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
         for _, row in geo_file.iterrows():
+            geo_id = row['geo_id']
             feature_dct = row[extra_feature].to_dict()
             feature_i = dict()
             feature_i['type'] = 'Feature'
+            feature_i['id'] = geo_id
             feature_i['properties'] = feature_dct
             feature_i['geometry'] = {}
             feature_i['geometry']['type'] = row['type']
@@ -521,56 +590,67 @@ class VisHelper:
 
         dyna_feature_lst = [_ for _ in list(dyna_file.columns) if _ not in self.dyna_reserved_lst]
         geojson_obj = {'type': "FeatureCollection", 'features': []}
-        trajectory = {}
         GPS_traj = "coordinates" in dyna_file.columns
-        if not GPS_traj:
+        if self.geo_path is not None:
             geo_file = pd.read_csv(self.geo_path, index_col=None)
 
         a = dyna_file.groupby("entity_id")
-        for entity_id, entity_value in a:
-            if "traj_id" in dyna_file.columns:
-                trajectory[entity_id] = {}
-                entity_value = entity_value.groupby("traj_id")
-                for traj_id, traj_value in entity_value:
-                    feature_dct = {"usr_id": entity_id, "traj_id": traj_id}
-                    for f in dyna_feature_lst:
-                        feature_dct[f] = float(traj_value[f].mean())
+        if not GPS_traj:
+            i = 0
+            for entity_id, entity_value in a:
+                if i < 3:
+                    feature_dct = {"usr_id": entity_id}
                     feature_i = dict()
                     feature_i['type'] = 'Feature'
                     feature_i['properties'] = feature_dct
                     feature_i['geometry'] = {}
                     feature_i['geometry']['type'] = "LineString"
                     feature_i['geometry']['coordinates'] = []
-                    if GPS_traj:
-                        for _, row in traj_value.iterrows():
-                            feature_i['geometry']['coordinates'].append(eval(row['coordinates']))
-                    else:
-                        for _, row in traj_value.iterrows():
-                            coor = eval(geo_file.loc[row['location']]['coordinates'])
-                            if _ == 0:
-                                feature_i['geometry']['coordinates'].append(coor[0])
-                            feature_i['geometry']['coordinates'].append(coor[1])
-                    geojson_obj['features'].append(feature_i)
-
-            else:
-                feature_dct = {"usr_id": entity_id}
-                feature_i = dict()
-                feature_i['type'] = 'Feature'
-                feature_i['properties'] = feature_dct
-                feature_i['geometry'] = {}
-                feature_i['geometry']['type'] = "LineString"
-                feature_i['geometry']['coordinates'] = []
-                if GPS_traj:
-                    for _, row in entity_value.iterrows():
-                        feature_i['geometry']['coordinates'].append(eval(row['coordinates']))
-                else:
                     for _, row in entity_value.iterrows():
                         coor = eval(geo_file.loc[row['location']]['coordinates'])
-                        if _ == 0:
-                            feature_i['geometry']['coordinates'].append(coor[0])
-                        feature_i['geometry']['coordinates'].append(coor[1])
+                        feature_i['geometry']['coordinates'].append(coor)
+                    i += 1
+                else:
+                    break
                 geojson_obj['features'].append(feature_i)
+        else:
+            if "traj_id" in dyna_file.columns:
+                trajectory = {}
+                i = 0
+                for entity_id, entity_value in a:
+                    if i < 3:
+                        trajectory[entity_id] = {}
+                        entity_value = entity_value.groupby("traj_id")
+                        for traj_id, traj_value in entity_value:
+                            feature_dct = {"usr_id": entity_id, "traj_id": traj_id}
+                            for f in dyna_feature_lst:
+                                feature_dct[f] = float(traj_value[f].mean())
+                            feature_i = dict()
+                            feature_i['type'] = 'Feature'
+                            feature_i['properties'] = feature_dct
+                            feature_i['geometry'] = {}
+                            feature_i['geometry']['type'] = "LineString"
+                            feature_i['geometry']['coordinates'] = []
+                            for _, row in traj_value.iterrows():
+                                feature_i['geometry']['coordinates'].append(eval(row['coordinates']))
+                            geojson_obj['features'].append(feature_i)
+                            i += 1
+                    else:
+                        break
 
+            else:
+                for entity_id, entity_value in a:
+                    feature_i = dict()
+                    feature_dct = {"usr_id": entity_id}
+                    feature_i = dict()
+                    feature_i['type'] = 'Feature'
+                    feature_i['properties'] = feature_dct
+                    feature_i['geometry'] = {}
+                    feature_i['geometry']['type'] = "LineString"
+                    feature_i['geometry']['coordinates'] = []
+                    for _, row in entity_value.iterrows():
+                        feature_i['geometry']['coordinates'].append(eval(row['coordinates']))
+                    geojson_obj['features'].append(feature_i)
         ensure_dir(self.save_path)
         save_name = "_".join(self.dyna_path.split('/')[-1].split('.')) + '.json'
         json.dump(geojson_obj, open(self.save_path + '/' + save_name, 'w',
