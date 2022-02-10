@@ -119,7 +119,6 @@ def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
     csv_pd = pd.DataFrame(columns=csv_column_name,data=csv_raw_data)
     csv_path = f"{url}" + os.sep + f"{file}" + '.csv'
     csv_pd.to_csv(csv_path,index=False)
-    print(csv_path)
     return csv_path
 
 
@@ -139,7 +138,6 @@ def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None):
             legend_name="Unemployment Rate (%)",
         ).add_to(m)
     else:
-        print('choose 2')
         folium.Choropleth(
             geo_data=state_geo,
             name="choropleth",
@@ -161,10 +159,8 @@ def show_geo_view(url, json_file, file, background_id):
     view_json = json.load(open(geo_layer, 'r'))
     _ = view_json['features'][0]
     origin_location = return_location(_)
-    print(origin_location)
     if origin_location is not None:
         logger.info('尝试绘制' + geo_layer + '文件的地理图象')
-        print(background_id)
         if int(background_id) == 1:
             background_url = 'https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
         elif int(background_id) == 2:
@@ -184,7 +180,6 @@ def show_geo_view(url, json_file, file, background_id):
             background_url = 'https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
         try:
             feature_list = get_json_features(geo_layer)
-            print(feature_list)
             # logger.info('json文件的可标记属性' + feature_list)
             loc1 = origin_location[0]
             loc = origin_location[1:]
@@ -216,11 +211,14 @@ def show_geo_view(url, json_file, file, background_id):
                     else:
                         make_map_double(_, heat, marker_cluster, tag1='inflow', tag2='outflow')
                 heat_minmax = make_heat(heat)
-                print(heat_minmax)
                 csv_url = make_Choropleth_csv(view_json, file, url, tag1='inflow',tag2='outflow')
-                add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow',tag2='outflow')
+                try:
+                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow',tag2='outflow')
+                except Exception:
+                    pass
                 HeatMap(heat_minmax).add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+
             elif 'features_properties_length' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, marker_cluster, 'length', mean_or_not=False)
@@ -425,6 +423,7 @@ def form_long_statis_html(test_dict, asix_y, page_legth, file):
     chart.save(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html")
 
 
+
 class VisHelper:
     def __init__(self, dataset, save_path):
         try:
@@ -456,8 +455,10 @@ class VisHelper:
                     self.dyna_file.append(file)
                 if file.split('.')[1] == 'grid':
                     self.grid_file.append(file)
-
-            # assert len(self.geo_file) == 1
+            try:
+                assert len(self.geo_file) == 1
+            except Exception:
+                pass
 
             # reserved columns
             self.geo_reserved_lst = ['type', 'coordinates']
@@ -468,17 +469,23 @@ class VisHelper:
 
     def visualize(self):
         try:
-            if self.type == 'trajectory' or 'traj':
+            if self.type == 'trajectory':
                 # geo
                 try:
                     self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
-                    # self._visualize_geo()
+                except Exception:
+                    pass
+                try:
+                    self._visualize_geo()
                 except Exception:
                     pass
                 # dyna
                 for dyna_file in self.dyna_file:
-                    self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
-                    self._visualize_dyna()
+                    try:
+                        self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
+                        self._visualize_dyna()
+                    except Exception:
+                        pass
             elif self.type == 'state':
                 self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
                 for dyna_file in self.dyna_file:
@@ -538,9 +545,8 @@ class VisHelper:
         grid_feature_lst = [_ for _ in list(grid_file.columns) if _ not in self.grid_reserved_lst]
 
         for _, row in geo_file.iterrows():
-
-            # get feature dictionary
             geo_id = row['geo_id']
+            # get feature dictionary
             row_id, column_id = row['row_id'], row['column_id']
             feature_dct = row[geo_feature_lst].to_dict()
             dyna_i = grid_file[(grid_file['row_id'] == row_id) & (grid_file['column_id'] == column_id)]
@@ -568,11 +574,9 @@ class VisHelper:
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         extra_feature = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
         for _, row in geo_file.iterrows():
-            geo_id = row['geo_id']
             feature_dct = row[extra_feature].to_dict()
             feature_i = dict()
             feature_i['type'] = 'Feature'
-            feature_i['id'] = geo_id
             feature_i['properties'] = feature_dct
             feature_i['geometry'] = {}
             feature_i['geometry']['type'] = row['type']
@@ -678,5 +682,5 @@ def get_geo_json(dataset, save_path):
         return file_form_status
     except Exception:
         file_form_status = DatasetStatusEnum.ERROR.value
-        print(file_form_status)
+        print('file_form_status'+file_form_status)
         return file_form_status
