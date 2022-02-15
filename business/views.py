@@ -136,6 +136,10 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         return generate_download_file(settings.DATASET_EXAMPLE_PATH)
 
+    @action(methods=['get'], detail=False, pagination_class=None)
+    def get_all(self, request, *args, **kwargs):
+        return self.list(self, request, *args, **kwargs)
+
     @action(methods=['get'], detail=True)
     def get_gis_view(self, request, *args, **kwargs):
         """
