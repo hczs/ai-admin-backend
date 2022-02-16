@@ -61,7 +61,7 @@ class ExecuteCommandThread(threading.Thread):
 
 class ExecuteGeojsonThread(threading.Thread):
     """
-    执行命令行命令线程，执行传入的命令str_command
+    生成geojson文件
     """
 
     def __init__(self, extract_path, thread_name):
@@ -85,7 +85,7 @@ class ExecuteGeojsonThread(threading.Thread):
 
 class ExecuteGeoViewThread(threading.Thread):
     """
-    执行命令行命令线程，执行传入的命令str_command
+    生成
     """
 
     def __init__(self, extract_path, thread_name, background_id):
