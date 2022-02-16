@@ -147,7 +147,7 @@ AUTHENTICATION_BACKENDS = (
 
 # simplejwt配置
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
 }
 
 # 日志配置
