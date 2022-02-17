@@ -510,8 +510,14 @@ class VisHelper:
         geo_feature_lst = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
         dyna_feature_lst = [_ for _ in list(dyna_file.columns) if _ not in self.dyna_reserved_lst]
 
+        geojson_obj = self._visualize_state_normal(geo_file,dyna_file,geo_feature_lst,dyna_feature_lst,geojson_obj)
+        ensure_dir(self.save_path)
+        save_name = "_".join(self.dyna_path.split('/')[-1].split('.')) + '.json'
+        json.dump(geojson_obj, open(self.save_path + '/' + save_name, 'w',
+                                    encoding='utf-8'),
+                  ensure_ascii=False, indent=4)
+    def _visualize_state_normal(self,geo_file,dyna_file,geo_feature_lst,dyna_feature_lst,geojson_obj):
         for _, row in geo_file.iterrows():
-
             # get feature dictionary
             geo_id = row['geo_id']
             feature_dct = row[geo_feature_lst].to_dict()
@@ -528,13 +534,44 @@ class VisHelper:
             feature_i['geometry']['type'] = row['type']
             feature_i['geometry']['coordinates'] = eval(row['coordinates'])
             geojson_obj['features'].append(feature_i)
+        return geojson_obj
+    def _visualize_state_time(self,geo_file,dyna_file,geo_feature_lst,dyna_feature_lst,geojson_obj):
+        count_geo = dyna_file.shape[0]
+        time_count = 0
+        print(dyna_file.isnull().sum())
+        length = geo_file.shape[0]
+        for _, row in geo_file.iterrows():
 
-        ensure_dir(self.save_path)
-        save_name = "_".join(self.dyna_path.split('/')[-1].split('.')) + '.json'
-        json.dump(geojson_obj, open(self.save_path + '/' + save_name, 'w',
-                                    encoding='utf-8'),
-                  ensure_ascii=False, indent=4)
+            # get feature dictionary
+            geo_id = row['geo_id']
+            feature_dct = row[geo_feature_lst].to_dict()
+            # print(feature_dct)
+            dyna_i = dyna_file[dyna_file['entity_id'] == geo_id]
+            # for f in dyna_feature_lst:
+            #     feature_dct[f] = dyna_i[f]
+            # 以下为测试热力图
+            listi = []
 
+            for f in dyna_feature_lst:
+                time_count = dyna_i[f].size
+                batch = int(time_count // 50)
+                for i in range(50):
+                    feature_dct[f] = float(dyna_i[f][i * batch:(i + 1) * batch].mean())
+                    # for item in feature_dct[f]:
+                    feature_dcti = row[geo_feature_lst].to_dict()
+                    feature_dcti[f] = feature_dct[f] / 100
+                    # 处理为0-1的数值
+                    # print(feature_dcti[f])
+                    listi.append(feature_dcti[f])
+                    feature_i = dict()
+                    feature_i['type'] = 'Feature'
+                    feature_i['properties'] = feature_dcti
+                    feature_i['geometry'] = {}
+                    feature_i['geometry']['type'] = row['type']
+                    feature_i['geometry']['coordinates'] = eval(row['coordinates'])
+                    # print(feature_i)
+                    geojson_obj['features'].append(feature_i)
+        return geojson_obj
     def _visualize_grid(self):
         geo_file = pd.read_csv(self.geo_path, index_col=None)
         grid_file = pd.read_csv(self.grid_path, index_col=None)
@@ -682,5 +719,5 @@ def get_geo_json(dataset, save_path):
         return file_form_status
     except Exception:
         file_form_status = DatasetStatusEnum.ERROR.value
-        print('file_form_status'+file_form_status)
+        print('file_form_status',file_form_status)
         return file_form_status
