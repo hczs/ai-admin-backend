@@ -177,3 +177,56 @@ def get_json_head(data, loc=""):
         for item in data_list:
             get_json_head(item, loc)
         return
+
+
+def get_background_url(background_id):
+    """
+    获取folium地图底图展示url
+    """
+    if int(background_id) == 1:
+        background_url = 'https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
+    elif int(background_id) == 2:
+        background_url = 'https://mt.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'
+    elif int(background_id) == 3:
+        background_url = 'https://webrd02.is.autonavi.com/appmaptile?lang=zh_en&size=1&scale=1&style=8&x={' \
+                         'x}&y={y}&z={z} '
+    elif int(background_id) == 4:
+        background_url = 'http://webst02.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
+    elif int(background_id) == 5:
+        background_url = 'OpenStreetMap'
+    elif int(background_id) == 6:
+        background_url = 'https://tileserver.memomaps.de/tilegen/{z}/{x}/{y}.png'
+    elif int(background_id) == 7:
+        background_url = 'https://stamen-tiles-{s}.a.ssl.fastly.net/toner-hybrid/{z}/{x}/{y}{r}.png'
+    else:
+        background_url = 'https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
+    return background_url
+
+
+def return_location(geo_json):
+    """
+    获取geojson的初始坐标点，返回符合folium的location的坐标点
+    """
+    block = geo_json['features'][0]
+    location = None
+    if len(block['geometry']['coordinates']) > 0:
+        if type(block['geometry']['coordinates'][0]) is not list:
+            location = block['geometry']['coordinates']
+        else:
+            if type(block['geometry']['coordinates'][0][0]) is not list:
+                location = block['geometry']['coordinates'][0]
+            else:
+                location = block['geometry']['coordinates'][0][0]
+    location.reverse()
+    return location
+
+
+def red_style(feature):
+    """
+    folium的style_function 红色
+    """
+    return {'fillOpacity': 0.4,
+            'weight': 2,
+            'fillColor': 'red',
+            'color': 'red'
+            }

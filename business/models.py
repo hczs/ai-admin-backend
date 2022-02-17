@@ -12,6 +12,8 @@ class File(BaseModel):
     file_size = models.BigIntegerField(null=True)
     file_path = models.CharField(max_length=200, null=True)
     extract_path = models.CharField(max_length=200, null=True)
+    # 地图底图id
+    background_id = models.IntegerField(default=1)
     # 数据集状态 0 处理中 1 处理完成
     dataset_status = models.IntegerField(default=0)
 
