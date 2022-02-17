@@ -9,6 +9,7 @@ from loguru import logger
 from business.enums import TaskStatusEnum, DatasetStatusEnum
 from business.evaluate import evaluate_insert
 from business.models import Task, File
+from business.show.task_show import generate_result_map
 from common.utils import execute_cmd, parentheses_escape
 from business.save_geojson import transfer_geo_json, get_geo_json
 
@@ -47,6 +48,8 @@ class ExecuteCommandThread(threading.Thread):
             task.task_status = TaskStatusEnum.COMPLETED.value
             # 评价指标入库
             evaluate_insert(task)
+            # 生成dataset和result对比的地图文件
+            generate_result_map(task)
         if status == 1:
             # 更新任务状态，表示执行出错
             task.task_status = TaskStatusEnum.ERROR.value

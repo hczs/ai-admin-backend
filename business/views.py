@@ -30,10 +30,12 @@ from business.serializers import FileSerializer, TaskSerializer, TaskListSeriali
     TrafficStateEtaSerializer, MapMatchingSerializer, TrajLocPredSerializer
 from business.evaluate import evaluate_insert
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
+from business.show.task_show import generate_result_map
 from business.threads import ExecuteCommandThread, ExecuteGeojsonThread, ExecuteGeoViewThread
 from common.response import PassthroughRenderer
 from common.utils import read_file_str, generate_download_file, str_is_empty
 from bs4 import BeautifulSoup
+from business.show import map_matching_show
 
 
 class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin, GenericViewSet):
@@ -158,6 +160,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         background_id = request.query_params.get('background')
         dataset = self.get_object()
         dataset.dataset_status = DatasetStatusEnum.PROCESSING.value
+        # 设置background_id
+        dataset.background_id = background_id
         dataset.save()
         # 启动执行任务线程，使用json生成folium的html展示页面
         ExecuteGeoViewThread(dataset.extract_path, dataset.file_name, background_id).start()
@@ -174,6 +178,11 @@ class TaskViewSet(ModelViewSet):
             return TaskListSerializer
         else:
             return TaskSerializer
+
+    @action(methods=['get'], detail=True)
+    def test(self, *args, **kwargs):
+        generate_result_map(self.get_object())
+        return Response(status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=True)
     def get_log(self, *args, **kwargs):
