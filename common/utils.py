@@ -216,7 +216,10 @@ def return_location(geo_json):
             if type(block['geometry']['coordinates'][0][0]) is not list:
                 location = block['geometry']['coordinates'][0]
             else:
-                location = block['geometry']['coordinates'][0][0]
+                if type(block['geometry']['coordinates'][0][0][0]) is not list:
+                    location = block['geometry']['coordinates'][0][0]
+                else:
+                    location = block['geometry']['coordinates'][0][0][0]
     location.reverse()
     return location
 
