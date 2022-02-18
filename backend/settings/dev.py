@@ -11,7 +11,7 @@ DATABASES = {
     # 测试
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'django1',  # 指定的数据库名
+        'NAME': 'test',  # 指定的数据库名
         'USER': 'root',  # 数据库登录的用户名
         # 'PASSWORD': 'Boco.123',  # 登录数据库的密码
         'PASSWORD': 'toor',  # 登录数据库的密码

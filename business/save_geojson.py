@@ -190,7 +190,7 @@ def show_geo_view(url, json_file, file, background_id):
                 tiles=background_url,
                 zoom_start=12, attr='default'
             )
-            marker_cluster = MarkerCluster().add_to(m)
+            marker_cluster = MarkerCluster(name='Cluster').add_to(m)
             print(background_url)
             #   所有可能的展示组合
             #   features_properties_traffic_speed
@@ -203,7 +203,7 @@ def show_geo_view(url, json_file, file, background_id):
                 for _ in view_json['features']:
                     make_map_only(_, heat, marker_cluster, tag='traffic_speed')
                 heat_minmax = make_heat(heat)
-                HeatMap(heat_minmax).add_to(m)
+                HeatMap(heat_minmax,name='traffic_speed_heatmap').add_to(m)
             elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
                 for _ in view_json['features']:
                     if _['geometry']['type'] == 'MultiPolygon':
@@ -216,7 +216,7 @@ def show_geo_view(url, json_file, file, background_id):
                     add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow',tag2='outflow')
                 except Exception:
                     pass
-                HeatMap(heat_minmax).add_to(m)
+                HeatMap(heat_minmax,name='abs_flow_heatmap').add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
 
             elif 'features_properties_length' in feature_list:
@@ -265,7 +265,10 @@ def return_location(block):
             if type(block['geometry']['coordinates'][0][0]) is not list:
                 location = block['geometry']['coordinates'][0]
             else:
-                location = block['geometry']['coordinates'][0][0]
+                if type(block['geometry']['coordinates'][0][0][0]) is not list:
+                    location = block['geometry']['coordinates'][0][0]
+                else:
+                    location = block['geometry']['coordinates'][0][0][0]
     return location
 
 
