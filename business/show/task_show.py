@@ -2,6 +2,7 @@ from loguru import logger
 
 from business.enums import TaskEnum
 from business.show import map_matching_show, traffic_predict
+from business.show import map_matching_show, road_learning_show
 from business.models import File
 
 
@@ -26,5 +27,6 @@ def generate_result_map(task):
             pass
         elif task_type == TaskEnum.TRAFFIC_STATE_PRED.value:
             traffic_predict.matching_result_map(dataset, task.id, dataset.background_id)
+            road_learning_show.learning_result_map(dataset, task.id, dataset.background_id)
         else:
             logger.info("generate_result_map: Unknown task type")

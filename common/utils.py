@@ -233,3 +233,15 @@ def red_style(feature):
             'fillColor': 'red',
             'color': 'red'
             }
+
+
+def random_style(feature):
+    """
+    返回一个随机颜色的style
+    """
+    color = ["#" + ''.join([random.choice('0123456789ABCDEF') for j in range(6)])]
+    return {'fillOpacity': 0.4,
+            'weight': 2,
+            'fillColor': color,
+            'color': color
+            }
