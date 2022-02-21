@@ -15,8 +15,8 @@ def generate_result_map(task):
     try:
         dataset = File.objects.get(file_name=task.dataset)
     except Exception as ex:
-        logger.info("generate_result_map: get dataset exception")
-        logger.info(ex)
+        logger.error("generate_result_map: get dataset exception")
+        logger.error(ex)
     else:
         if task_type == TaskEnum.MAP_MATCHING.value:
             # 路网匹配
@@ -28,4 +28,4 @@ def generate_result_map(task):
             # 交通状态预测
             traffic_predict.matching_result_map(dataset, task.id, dataset.background_id)
         else:
-            logger.info("generate_result_map: Unknown task type")
+            logger.error("generate_result_map: Unknown task type")
