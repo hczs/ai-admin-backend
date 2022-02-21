@@ -39,7 +39,7 @@ def matching_result_map(dataset_file, task_id, background_id):
         map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task_id) + "_result.html"
         render_to_map(dataset_json_path, result_json_path, background_id, map_save_path)
     else:
-        logger.info("result json not found")
+        logger.error("result json not found")
 
 
 def render_to_map(dataset_json, result_json, background_id, map_save_path):

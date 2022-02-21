@@ -35,7 +35,7 @@ def learning_result_map(dataset_file, task_id, background_id):
         if file.endswith(".csv"):
             csv_path = result_dir + file
     if not csv_path:
-        logger.info('The task result csv file not found')
+        logger.error('The task result csv file not found')
         return
     logger.info('learning_result_map: result file path is ' + csv_path)
     # 根据class分组
@@ -51,7 +51,7 @@ def learning_result_map(dataset_file, task_id, background_id):
         )
         break
     if not map:
-        logger.info('csv file format error')
+        logger.error('csv file format error')
     # 把每组的数据单独渲染一份geojson
     for name, group in grouped:
         folium.GeoJson(dataframe_to_geojson(group),
