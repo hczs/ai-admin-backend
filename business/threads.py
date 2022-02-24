@@ -99,6 +99,7 @@ class ExecuteGeoViewThread(threading.Thread):
         super(ExecuteGeoViewThread, self).__init__(name=thread_name)
 
     def run(self):
+        settings.IN_PROGRESS.append(self.file_name)
         file_obj = File.objects.get(file_name=self.file_name)
         file_view_status = DatasetStatusEnum.PROCESSING.value
         try:
@@ -116,3 +117,5 @@ class ExecuteGeoViewThread(threading.Thread):
             logger.info(self.file_name + "数据可视化处理失败")
         file_obj.dataset_status = file_view_status
         file_obj.save()
+        settings.IN_PROGRESS.remove(self.file_name)
+        settings.COMPLETED.append(self.file_name)
