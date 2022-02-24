@@ -1,5 +1,7 @@
 import json
 import os
+
+import pandas as pd
 from django.conf import settings
 import folium
 from folium.plugins import HeatMapWithTime
@@ -32,17 +34,31 @@ def matching_result_map(dataset_file, task_id, background_id):
     # 准备dataset dyna json
     dataset_dir = dataset_dir + "_geo_json"
     dataset_json_path = None
+    dataset_grid_json_path = None
     file_list = os.listdir(dataset_dir)
     for file in file_list:
         if file.count('dyna') > 0 and file.count("truth_dyna") == 0:
             dataset_json_path = dataset_dir + os.sep + file
-    print(dataset_json_path)
+        elif file.count('grid') > 0:
+            dataset_grid_json_path = dataset_dir + os.sep + file
+    # print(dataset_json_path)
     # 生成地图
     if result_json_path and dataset_json_path:
         logger.info("The result json path is: " + result_json_path)
         logger.info("The dataset json path is: " + dataset_json_path)
         map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task_id) + "_result.html"
-        render_to_map(dataset_json_path, result_json_path, background_id, map_save_path)
+        try:
+            render_to_map(dataset_json_path, result_json_path, background_id, map_save_path)
+        except Exception:
+            pass
+    elif result_json_path and dataset_grid_json_path:
+        logger.info("The result json path is: " + result_json_path)
+        logger.info("The dataset json path is: " + dataset_grid_json_path)
+        map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task_id) + "_result.html"
+        try:
+            render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path,dataset_dir)
+        except Exception:
+            pass
     else:
         logger.info("result json not found")
 
@@ -70,6 +86,7 @@ def render_to_map(dataset_json_path, result_json_path, background_id, map_save_p
     folium.LayerControl().add_to(m)
     logger.info("The task result file was generated successfully, html path: " + map_save_path)
     m.save(map_save_path)
+
 
 def make_series_list(result, dataset_json_path):
     if result.ndim == 4:
@@ -109,3 +126,58 @@ def make_series_list(result, dataset_json_path):
             list_item.append(list_k[i])
         list_hm.append(list_item)
     return list_hm
+
+
+def render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path,dataset_dir):
+    dataset_json_content = json.load(open(dataset_grid_json_path, 'r'))
+    file_data = np.load(result_json_path)
+    prediction = file_data['prediction']
+    truth = file_data['truth']
+    dif = prediction-truth
+    m = folium.Map(
+        location=return_location(dataset_json_content),
+        tiles=get_background_url(background_id),
+        zoom_start=12, attr='default'
+    )
+    print(123)
+    make_cor(prediction, m, dataset_json_content,dataset_dir,name='pre_Choropleth')
+    print(1234)
+    make_cor(truth, m, dataset_json_content,dataset_dir,name='truth_Choropleth')
+    make_cor(dif, m, dataset_json_content,dataset_dir,name='differ_Choropleth')
+    folium.LayerControl().add_to(m)
+    logger.info("The task result file was generated successfully, html path: " + map_save_path)
+    m.save(map_save_path)
+
+
+def make_cor(data, m, dataset_json_content,dataset_dir,name):
+    data = data.reshape(len(data), -1, 2)
+    data_mean = data.mean(axis=0)
+    data_mean = data_mean.mean(axis=1)
+    data_list = []
+    for item in data_mean:
+        data_list.append([item])
+    print(data_list)
+    # data_list = np.array(data_list)
+    list_geoid = []
+    for _ in dataset_json_content['features']:
+        list_geoid.append(int(_['id']))
+    # list_geoid = np.array(list_geoid)
+    print(list_geoid)
+    i = 0
+    for item in list_geoid:
+        data_list[i].insert(0,item)
+        i+=1
+    # np.insert(data_list, 0, list_geoid,axis=1)
+    print(data_list)
+    data_list = np.array(data_list)
+    csv_url = dataset_dir + "/form_cor.csv"
+    np.savetxt(csv_url,data_list, delimiter=',')
+    print(12345)
+    df = pd.read_csv(csv_url, header=None, names=['geo_id', 'sum_inflow_outflow'])
+    df.to_csv(csv_url, index=False)
+    print(123456)
+    try:
+        business.save_geojson.add_Choropleth(csv_url, m, state_geo=dataset_json_content, tag1='inflow', tag2='outflow',name=name)
+        print(12)
+    except Exception:
+        pass
