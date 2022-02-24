@@ -122,13 +122,13 @@ def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
     return csv_path
 
 
-def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None):
+def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None,name="choropleth"):
     Choropleth_data = pd.read_csv(csv_url)
     if tag2 is None:
         print('choose 1')
         folium.Choropleth(
             geo_data=state_geo,
-            name="choropleth",
+            name=name,
             data=Choropleth_data,
             columns=["geo_id", tag1],
             key_on="feature.id",
@@ -140,7 +140,7 @@ def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None):
     else:
         folium.Choropleth(
             geo_data=state_geo,
-            name="choropleth",
+            name=name,
             data=Choropleth_data,
             columns=["geo_id", 'sum_'+tag1+'_'+tag2],
             key_on="feature.id",
@@ -203,7 +203,7 @@ def show_geo_view(url, json_file, file, background_id):
                 for _ in view_json['features']:
                     make_map_only(_, heat, marker_cluster, tag='traffic_speed')
                 heat_minmax = make_heat(heat)
-                HeatMap(heat_minmax,name='traffic_speed_heatmap').add_to(m)
+                HeatMap(heat_minmax, name='traffic_speed_heatmap').add_to(m)
             elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
                 for _ in view_json['features']:
                     if _['geometry']['type'] == 'MultiPolygon':
@@ -213,11 +213,11 @@ def show_geo_view(url, json_file, file, background_id):
                 heat_minmax = make_heat(heat)
                 csv_url = make_Choropleth_csv(view_json, file, url, tag1='inflow',tag2='outflow')
                 try:
-                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow',tag2='outflow')
+                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow',tag2='outflow',name='Cor')
                 except Exception:
                     pass
                 HeatMap(heat_minmax,name='abs_flow_heatmap').add_to(m)
-                folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+                folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
 
             elif 'features_properties_length' in feature_list:
                 for _ in view_json['features']:
