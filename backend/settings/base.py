@@ -37,7 +37,11 @@ INSTALLED_APPS = [
     'drf_yasg',  # 接口文档
     'corsheaders',  # 跨域问题
     'rest_framework_simplejwt.token_blacklist',  # 拉黑token
+    # 'channels' # websocket
 ]
+
+# asgi支持wsgi、更多协议
+# ASGI_APPLICATION = 'socketpro.asgi.application'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # 跨域问题
@@ -168,3 +172,7 @@ LOGGING = {
         },
     }
 }
+
+# 自定义任务序列
+IN_PROGRESS = []
+COMPLETED = []
