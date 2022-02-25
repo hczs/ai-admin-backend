@@ -13,6 +13,8 @@ from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
+from loguru import logger
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Quick-start development settings - unsuitable for production
@@ -176,3 +178,7 @@ LOGGING = {
 # 自定义任务序列
 IN_PROGRESS = []
 COMPLETED = []
+
+# 日志记录
+logger.add("file_{time}.log", rotation="10 MB", encoding="utf-8")
+logger.info("base.py settings loading")
