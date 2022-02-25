@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import tempfile
@@ -391,6 +392,37 @@ class TrafficStateEtaViewSet(ModelViewSet):
     queryset = TrafficStatePredAndEta.objects.all()
     serializer_class = TrafficStateEtaSerializer
     filterset_fields = ['task']
+
+    @action(methods=['get'], detail=False)
+    def get_evaluate_mode(self, request, *args, **kwargs):
+        """
+        获取评估指标的模式
+
+        :return: average or single
+        """
+        # 优先解析配置文件
+        task_id = request.query_params.get('task')
+        task = Task.objects.get(id=task_id)
+        config_file = task.config_file
+        with open(config_file, 'r', encoding='UTF-8') as f:
+            json_dict = json.load(f)
+        for key in json_dict:
+            if key == "mode":
+                res_data = {
+                    "mode": json_dict[key]
+                }
+                return Response(data=res_data, status=status.HTTP_200_OK)
+        # 解析默认json评估模式
+        default_evaluate_config = settings.LIBCITY_PATH + os.sep + "libcity/config/evaluator/TrafficStateEvaluator.json"
+        with open(default_evaluate_config, 'r', encoding='UTF-8') as f:
+            json_dict = json.load(f)
+        for key in json_dict:
+            if key == "mode":
+                res_data = {
+                    "mode": json_dict[key]
+                }
+                return Response(data=res_data, status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=False)
     def other_contrast_line(self, request, *args, **kwargs):
