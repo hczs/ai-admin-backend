@@ -405,15 +405,18 @@ class TrafficStateEtaViewSet(ModelViewSet):
         logger.info("param task id: " + task_id)
         task = Task.objects.get(id=task_id)
         config_file = task.config_file
-        logger.info("evaluate config json file path: " + config_file)
-        with open(config_file, 'r', encoding='UTF-8') as f:
-            json_dict = json.load(f)
-        for key in json_dict:
-            if key == "mode":
-                res_data = {
-                    "mode": json_dict[key]
-                }
-                return Response(data=res_data, status=status.HTTP_200_OK)
+        if config_file is not None:
+            logger.info("evaluate config json file path: " + config_file)
+            with open(config_file, 'r', encoding='UTF-8') as f:
+                json_dict = json.load(f)
+            for key in json_dict:
+                if key == "mode":
+                    res_data = {
+                        "mode": json_dict[key]
+                    }
+                    return Response(data=res_data, status=status.HTTP_200_OK)
+        else:
+            logger.info("Evaluate no configuration json")
         # 解析默认json评估模式
         default_evaluate_config = settings.LIBCITY_PATH + os.sep + "libcity" + os.sep + "config" + os.sep + "evaluator" \
                                   + os.sep + "TrafficStateEvaluator.json"
