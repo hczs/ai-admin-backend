@@ -9,7 +9,7 @@ from django.conf import settings
 from folium.plugins import HeatMap, MarkerCluster
 
 from business.enums import DatasetStatusEnum
-from common.utils import get_json_features
+from common.utils import get_json_features, random_style
 from loguru import logger
 from sklearn import preprocessing
 import numpy as np
@@ -224,9 +224,27 @@ def show_geo_view(url, json_file, file, background_id):
                     make_map_only(_, heat, marker_cluster, 'length', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_traj_id' in feature_list:
+                # 轨迹数据
                 for _ in view_json['features']:
                     make_map_only(_, heat, marker_cluster, 'traj_id', mean_or_not=False)
-                folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+                # 轨迹数据添加popup和tooltip区分轨迹
+                # 自定义tooltip
+                tooltip = folium.GeoJsonTooltip(
+                    fields=["traj_id"],
+                    aliases=["轨迹id: "], )
+                # 自定义popup
+                popup = folium.GeoJsonPopup(
+                    fields=["traj_id"],
+                    aliases=["轨迹id: "],
+                    localize=True,
+                    labels=True,
+                )
+                # 轨迹数据添加颜色区分轨迹
+                folium.GeoJson(geo_layer,
+                               name=f"{json_file}",
+                               tooltip=tooltip,
+                               popup=popup,
+                               style_function=random_style).add_to(m)
             elif 'features_properties_usr_id' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, marker_cluster, 'usr_id', mean_or_not=False)
