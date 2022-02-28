@@ -217,8 +217,11 @@ class TaskViewSet(ModelViewSet):
         task = self.get_object()
         if task.task_status == TaskStatusEnum.IN_PROGRESS.value:
             file_list = os.listdir(settings.LOG_PATH)
+            # 按照时间排序文件列表
+            dir_list = sorted(file_list, key=lambda x: os.path.getmtime(os.path.join(settings.LOG_PATH, x)), reverse=True)
+            logger.info("按时间倒序排序后的日志文件列表: {}", dir_list)
             log_file = settings.LOG_PATH
-            for file in file_list:
+            for file in dir_list:
                 if os.path.splitext(file)[0].split('-')[0] == str(task.id):
                     log_file += file
                     break
