@@ -208,6 +208,30 @@ class TaskViewSet(ModelViewSet):
         return Response(status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=True)
+    def get_task_status(self, *args, **kwargs):
+        """
+        前端轮询此接口，返回任务状态
+        """
+        task = self.get_object()
+        task_name = task.task_name
+        cur_task_key = task.task_name + str(task.id)
+        logger.info('进行中的实验: ')
+        logger.info(settings.IN_PROGRESS)
+        logger.info('已完成的实验: ')
+        logger.info(settings.COMPLETED)
+        for task_key in settings.COMPLETED:
+            if task_key == cur_task_key:
+                logger.info('实验执行完毕：' + task_name)
+                # remove掉这一条记录
+                settings.COMPLETED.remove(task_key)
+                res_data = {
+                    "task_name": task_name
+                }
+                return Response(status=status.HTTP_200_OK, data=res_data)
+        logger.info('实验暂未完成：' + task_name)
+        return Response(status=status.HTTP_202_ACCEPTED)
+
+    @action(methods=['get'], detail=True)
     def get_log(self, *args, **kwargs):
         """
         获取指定任务的运行日志
