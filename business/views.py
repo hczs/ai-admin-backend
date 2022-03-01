@@ -170,25 +170,27 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
 
     @action(methods=['get'], detail=True)
     def get_file_status(self, request, *args, **kwargs):
+        """
+        前端轮询此接口，持续监控文件状态
+        """
         dataset = self.get_object()
         cur_file_name = dataset.file_name
-        while True:
-            for file_name in settings.COMPLETED:
-                if file_name == cur_file_name:
-                    logger.info('可视化完成：' + file_name)
-                    # remove掉这一条记录
-                    settings.COMPLETED.remove(file_name)
-                    logger.info('进行中的可视化任务: ')
-                    logger.info(settings.IN_PROGRESS)
-                    logger.info('已完成的可视化任务: ')
-                    logger.info(settings.COMPLETED)
-                    res_data = {
-                        "file_name": file_name
-                    }
-                    return Response(status=status.HTTP_200_OK, data=res_data)
-                else:
-                    logger.info('文件暂未可视化完成：' + file_name)
-            time.sleep(3)
+        for file_name in settings.COMPLETED:
+            if file_name == cur_file_name:
+                logger.info('可视化完成：' + file_name)
+                # remove掉这一条记录
+                settings.COMPLETED.remove(file_name)
+                logger.info('进行中的可视化任务: ')
+                logger.info(settings.IN_PROGRESS)
+                logger.info('已完成的可视化任务: ')
+                logger.info(settings.COMPLETED)
+                res_data = {
+                    "file_name": file_name
+                }
+                return Response(status=status.HTTP_200_OK, data=res_data)
+        logger.info('文件暂未可视化完成: {}', cur_file_name)
+        return Response(status=status.HTTP_202_ACCEPTED)
+
 
 
 class TaskViewSet(ModelViewSet):
