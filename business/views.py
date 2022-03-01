@@ -175,15 +175,15 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         dataset = self.get_object()
         cur_file_name = dataset.file_name
+        logger.info('进行中的可视化任务: ')
+        logger.info(settings.IN_PROGRESS)
+        logger.info('已完成的可视化任务: ')
+        logger.info(settings.COMPLETED)
         for file_name in settings.COMPLETED:
             if file_name == cur_file_name:
                 logger.info('可视化完成：' + file_name)
                 # remove掉这一条记录
                 settings.COMPLETED.remove(file_name)
-                logger.info('进行中的可视化任务: ')
-                logger.info(settings.IN_PROGRESS)
-                logger.info('已完成的可视化任务: ')
-                logger.info(settings.COMPLETED)
                 res_data = {
                     "file_name": file_name
                 }
