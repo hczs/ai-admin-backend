@@ -31,6 +31,9 @@ class ExecuteCommandThread(threading.Thread):
         os.chdir(settings.LIBCITY_PATH)
         logger.info('change dir: ' + os.getcwd())
         task = Task.objects.get(task_name=self.name)
+        # 放入执行中队列中
+        task_key = task.task_name + str(task.id)
+        settings.IN_PROGRESS.append(task_key)
         # 任务开始执行，变更任务状态
         # 变更任务状态
         task.task_status = TaskStatusEnum.IN_PROGRESS.value
@@ -60,6 +63,8 @@ class ExecuteCommandThread(threading.Thread):
         # 返回原工作目录
         os.chdir(backup_dir)
         logger.info('execute completed! change path to: ' + os.getcwd())
+        settings.IN_PROGRESS.remove(task_key)
+        settings.COMPLETED.append(task_key)
 
 
 class ExecuteGeojsonThread(threading.Thread):
