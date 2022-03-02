@@ -184,6 +184,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                 logger.info('可视化完成：' + file_name)
                 # remove掉这一条记录
                 settings.COMPLETED.remove(file_name)
+                logger.info('after remove COMPLETED: {}', settings.COMPLETED)
                 res_data = {
                     "file_name": file_name
                 }
