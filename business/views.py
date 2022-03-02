@@ -205,6 +205,10 @@ class TaskViewSet(ModelViewSet):
         else:
             return TaskSerializer
 
+    def list(self, request, *args, **kwargs):
+        self.queryset = TaskListSerializer.setup_eager_loading(self.queryset)
+        return super(TaskViewSet, self).list(self, request, *args, **kwargs)
+
     @action(methods=['get'], detail=True)
     def test(self, *args, **kwargs):
         generate_result_map(self.get_object())

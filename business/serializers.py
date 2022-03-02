@@ -32,6 +32,12 @@ class TaskSerializer(serializers.ModelSerializer):
 class TaskListSerializer(serializers.ModelSerializer):
     creator = serializers.StringRelatedField()
 
+    @staticmethod
+    def setup_eager_loading(queryset):
+        """ Perform necessary eager loading of data. """
+        queryset = queryset.prefetch_related('creator')
+        return queryset
+
     class Meta:
         model = Task
         fields = '__all__'
