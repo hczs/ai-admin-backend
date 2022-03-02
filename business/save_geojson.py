@@ -1,5 +1,7 @@
 from copy import copy
+from string import Template
 
+import branca
 import folium
 import pandas as pd
 import json
@@ -45,16 +47,30 @@ def make_map_only(_, heat, marker_cluster, tag, mean_or_not=True):
     heatmap = copy(loc)
     heatmap.append(_['properties'][tag])
     heat.append(heatmap)
+    # 构造popup
+    properties_dict = _['properties']
+    coordinates_list = _['geometry']['coordinates']
+    # popup模板
+    mean_template = Template("mean of ${property}: ${value}<br>")
+    simple_template = Template("${property}: ${value}<br>")
+    popup = ''
     if mean_or_not:
-        folium.Marker(
-            location=loc,
-            popup='mean ' + tag + '=' + str(_['properties'][tag]),
-        ).add_to(marker_cluster)
+        # 遍历dict加入popup
+        for key in properties_dict:
+            if key == tag:
+                popup += mean_template.safe_substitute(property=key, value=properties_dict[key])
+            else:
+                popup += simple_template.safe_substitute(property=key, value=properties_dict[key])
     else:
-        folium.Marker(
-            location=loc,
-            popup=tag + '=' + str(_['properties'][tag]),
-        ).add_to(marker_cluster)
+        for key in properties_dict:
+            popup += simple_template.safe_substitute(property=key, value=properties_dict[key])
+    # 最后附加经纬度相关信息
+    popup += 'Latitude: ' + str(loc[0]) + '<br>'
+    popup += 'Longitude: ' + str(loc[1]) + '<br>'
+    folium.Marker(
+        location=loc,
+        popup=folium.Popup(popup, max_width=300),
+    ).add_to(marker_cluster)
 
 
 def make_map_double(_, heat, marker_cluster, tag1, tag2, mean_or_not=True):
@@ -65,16 +81,30 @@ def make_map_double(_, heat, marker_cluster, tag1, tag2, mean_or_not=True):
     heatmap = copy(loc)
     heatmap.append(abs(_['properties'][tag1] + _['properties'][tag2]))
     heat.append(heatmap)
+    # 构造popup
+    properties_dict = _['properties']
+    coordinates_list = _['geometry']['coordinates']
+    # popup模板
+    mean_template = Template("mean of ${property}: ${value}<br>")
+    simple_template = Template("${property}: ${value}<br>")
+    popup = ''
     if mean_or_not:
-        folium.Marker(
-            location=loc,
-            popup=tag1 + '+' + tag2 + '=' + str(_['properties'][tag1] + _['properties'][tag2]),
-        ).add_to(marker_cluster)
+        # 遍历dict加入popup
+        for key in properties_dict:
+            if key == tag1 or key == tag2:
+                popup += mean_template.safe_substitute(property=key, value=properties_dict[key])
+            else:
+                popup += simple_template.safe_substitute(property=key, value=properties_dict[key])
     else:
-        folium.Marker(
-            location=loc,
-            popup=tag1 + '+' + tag2 + '=' + str(_['properties'][tag1] + _['properties'][tag2]),
-        ).add_to(marker_cluster)
+        for key in properties_dict:
+            popup += simple_template.safe_substitute(property=key, value=properties_dict[key])
+        # 最后附加经纬度相关信息
+    popup += 'Latitude: ' + str(loc[0]) + '<br>'
+    popup += 'Longitude: ' + str(loc[1]) + '<br>'
+    folium.Marker(
+        location=loc,
+        popup=folium.Popup(popup, max_width=300),
+    ).add_to(marker_cluster)
 
 
 def make_heat(heat):
@@ -190,7 +220,8 @@ def show_geo_view(url, json_file, file, background_id):
                 tiles=background_url,
                 zoom_start=12, attr='default'
             )
-            marker_cluster = MarkerCluster(name='Cluster').add_to(m)
+            # 去除点聚合
+            # marker_cluster = MarkerCluster(name='Cluster').add_to(m)
             print(background_url)
             #   所有可能的展示组合
             #   features_properties_traffic_speed
@@ -201,15 +232,18 @@ def show_geo_view(url, json_file, file, background_id):
             #   (last property in list)
             if 'features_properties_traffic_speed' in feature_list:
                 for _ in view_json['features']:
-                    make_map_only(_, heat, marker_cluster, tag='traffic_speed')
+                    make_map_only(_, heat, m, tag='traffic_speed')
                 heat_minmax = make_heat(heat)
-                HeatMap(heat_minmax, name='traffic_speed_heatmap').add_to(m)
+                # 获取colormap 和 gradient_map
+                colormap, gradient_map = get_colormap_gradient(view_json['features'], 'traffic_speed')
+                colormap.add_to(m)
+                HeatMap(heat_minmax, name='traffic_speed_heatmap', gradient=gradient_map).add_to(m)
             elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
                 for _ in view_json['features']:
                     if _['geometry']['type'] == 'MultiPolygon':
                         pass
                     else:
-                        make_map_double(_, heat, marker_cluster, tag1='inflow', tag2='outflow')
+                        make_map_double(_, heat, m, tag1='inflow', tag2='outflow')
                 heat_minmax = make_heat(heat)
                 csv_url = make_Choropleth_csv(view_json, file, url, tag1='inflow',tag2='outflow')
                 try:
@@ -221,12 +255,12 @@ def show_geo_view(url, json_file, file, background_id):
 
             elif 'features_properties_length' in feature_list:
                 for _ in view_json['features']:
-                    make_map_only(_, heat, marker_cluster, 'length', mean_or_not=False)
+                    make_map_only(_, heat, m, 'length', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_traj_id' in feature_list:
                 # 轨迹数据
                 for _ in view_json['features']:
-                    make_map_only(_, heat, marker_cluster, 'traj_id', mean_or_not=False)
+                    make_map_only(_, heat, m, 'traj_id', mean_or_not=False)
                 # 轨迹数据添加popup和tooltip区分轨迹
                 # 自定义tooltip
                 tooltip = folium.GeoJsonTooltip(
@@ -247,19 +281,21 @@ def show_geo_view(url, json_file, file, background_id):
                                style_function=random_style).add_to(m)
             elif 'features_properties_usr_id' in feature_list:
                 for _ in view_json['features']:
-                    make_map_only(_, heat, marker_cluster, 'usr_id', mean_or_not=False)
+                    make_map_only(_, heat, m, 'usr_id', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             elif 'features_properties_highway' in feature_list:
                 for _ in view_json['features']:
-                    make_map_only(_, heat, marker_cluster, 'highway', mean_or_not=False)
+                    make_map_only(_, heat, m, 'highway', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             else:
                 property = str(feature_list[-1]).replace('features_properties_', '')
                 for _ in view_json['features']:
-                    make_map_only(_, heat, marker_cluster, property, mean_or_not=False)
+                    make_map_only(_, heat, m, property, mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             # add data point to the mark cluster
             folium.LayerControl().add_to(m)
+            # 添加鼠标点击显示经纬度函数
+            m.add_child(folium.LatLngPopup())
             geo_view_path = settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"
             m.save(geo_view_path)
             file_view_status = DatasetStatusEnum.SUCCESS.value
@@ -742,3 +778,36 @@ def get_geo_json(dataset, save_path):
         file_form_status = DatasetStatusEnum.ERROR.value
         print('file_form_status',file_form_status)
         return file_form_status
+
+
+def get_colormap_gradient(features, tag):
+    """
+    根据地图的features构造colormap和热力图的gradient_map
+
+    :param features: features
+    :param tag: properties中的key
+    :return: colormap和热力图的gradient_map
+    """
+    weight_list = []
+    for feature in features:
+        weight = feature['properties'][tag]
+        weight_list.append(weight)
+    min_weight = np.min(weight_list)
+    max_weight = np.max(weight_list)
+    # 构造color_map
+    steps = 5
+    color_map = branca.colormap.linear.YlOrRd_09.scale(min_weight, max_weight).to_step(steps)
+    color_map.caption = tag
+    gradient_map = {}
+    # 构造 gradient_map
+    index_values = color_map.index
+    print('index_values', index_values)
+    logger.info('index_values: {}', index_values)
+    res_values = []
+    for x in index_values:
+        x = float(x - np.min(index_values)) / (np.max(index_values) - np.min(index_values))
+        res_values.append(x)
+    for i in range(len(res_values)):
+        gradient_map[res_values[i]] = color_map.rgb_hex_str(index_values[i])
+    logger.info('gradient_map构造完毕：{}', gradient_map)
+    return color_map, gradient_map
