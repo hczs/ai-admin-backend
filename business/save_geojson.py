@@ -282,7 +282,20 @@ def show_geo_view(url, json_file, file, background_id):
             elif 'features_properties_usr_id' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, m, 'usr_id', mean_or_not=False)
-                folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
+                # 自定义tooltip
+                usr_tooltip = folium.GeoJsonTooltip(
+                    fields=["usr_id"],
+                    aliases=["usr_id: "], )
+                # 自定义popup
+                usr_popup = folium.GeoJsonPopup(
+                    fields=["usr_id"],
+                    aliases=["usr_id: "],
+                    localize=True,
+                    labels=True,
+                )
+                folium.GeoJson(
+                    geo_layer, name=f"{json_file}",
+                    tooltip=usr_tooltip, popup=usr_popup, style_function=random_style).add_to(m)
             elif 'features_properties_highway' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, m, 'highway', mean_or_not=False)
