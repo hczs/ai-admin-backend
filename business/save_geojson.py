@@ -801,8 +801,7 @@ def get_colormap_gradient(features, tag):
     gradient_map = {}
     # 构造 gradient_map
     index_values = color_map.index
-    print('index_values', index_values)
-    logger.info('index_values: {}', index_values)
+    logger.info('colormap index values: {}', index_values)
     res_values = []
     for x in index_values:
         x = float(x - np.min(index_values)) / (np.max(index_values) - np.min(index_values))
