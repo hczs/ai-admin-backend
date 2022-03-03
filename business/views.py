@@ -40,7 +40,7 @@ from business.show import map_matching_show
 
 
 class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin, GenericViewSet):
-    queryset = File.objects.all()
+    queryset = File.objects.all().order_by('-create_time')
     serializer_class = FileSerializer
     parser_classes = [MultiPartParser, JSONParser]
     filter_class = FileFilter

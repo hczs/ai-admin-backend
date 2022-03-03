@@ -78,6 +78,7 @@ class ExecuteGeojsonThread(threading.Thread):
         super(ExecuteGeojsonThread, self).__init__(name=thread_name)
 
     def run(self):
+        settings.IN_PROGRESS.append(self.file_name)
         file_view_status = DatasetStatusEnum.UN_PROCESS.value
         file_obj = File.objects.get(file_name=self.file_name)
         file_form_status = get_geo_json(self.file_name, self.extract_path + '_geo_json')
@@ -89,6 +90,8 @@ class ExecuteGeojsonThread(threading.Thread):
             logger.info(self.file_name + '无法生成geojson文件')
             file_obj.dataset_status = file_form_status
         file_obj.save()
+        settings.IN_PROGRESS.remove(self.file_name)
+        settings.COMPLETED.append(self.file_name)
 
 
 class ExecuteGeoViewThread(threading.Thread):
