@@ -119,8 +119,12 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         ExecuteGeojsonThread(extract_path, file_name).start()
 
     def perform_destroy(self, instance):
+        # 删除记录前先检查是否有实验正在使用此数据集，如果有就提示不能删除
+        dataset = self.get_object()
+        tasks = Task.objects.filter(dataset=dataset.file_name)
+        if len(tasks) > 0:
+            return False
         # 删除记录先删除对应文件
-
         if os.path.isfile(instance.file_path):
             os.remove(instance.file_path)
         if os.path.isdir(instance.extract_path):
@@ -130,6 +134,14 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         if os.path.isfile(settings.ADMIN_FRONT_HTML_PATH + instance.file_name + '.html'):
             os.remove(settings.ADMIN_FRONT_HTML_PATH + instance.file_name + '.html')
         instance.delete()
+        return True
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        result = self.perform_destroy(instance)
+        if result:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'detail': '有实验正在使用此数据集，请删除实验后再删除数据集'})
 
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=False)
@@ -193,7 +205,6 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
-
 class TaskViewSet(ModelViewSet):
     queryset = Task.objects.all().order_by('-create_time')
     serializer_class = TaskSerializer
@@ -249,7 +260,8 @@ class TaskViewSet(ModelViewSet):
         if task.task_status == TaskStatusEnum.IN_PROGRESS.value:
             file_list = os.listdir(settings.LOG_PATH)
             # 按照时间排序文件列表
-            dir_list = sorted(file_list, key=lambda x: os.path.getmtime(os.path.join(settings.LOG_PATH, x)), reverse=True)
+            dir_list = sorted(file_list, key=lambda x: os.path.getmtime(os.path.join(settings.LOG_PATH, x)),
+                              reverse=True)
             logger.info("按时间倒序排序后的日志文件列表: {}", dir_list)
             log_file = settings.LOG_PATH
             for file in dir_list:
