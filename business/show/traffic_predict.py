@@ -1,6 +1,7 @@
 import json
 import os
 
+import geojson
 import pandas as pd
 from django.conf import settings
 import folium
@@ -9,7 +10,7 @@ from loguru import logger
 import numpy as np
 
 import business.save_geojson
-from business.save_geojson import make_heat
+from business.save_geojson import make_heat, make_map_only, get_colormap_gradient
 from common.utils import return_location, get_background_url
 
 
@@ -49,16 +50,16 @@ def matching_result_map(dataset_file, task_id, background_id):
         map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task_id) + "_result.html"
         try:
             render_to_map(dataset_json_path, result_json_path, background_id, map_save_path)
-        except Exception:
-            pass
+        except Exception as ex:
+            logger.error('render_to_map异常：{}', ex)
     elif result_json_path and dataset_grid_json_path:
         logger.info("The result json path is: " + result_json_path)
         logger.info("The dataset json path is: " + dataset_grid_json_path)
         map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task_id) + "_result.html"
         try:
             render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path,dataset_dir)
-        except Exception:
-            pass
+        except Exception as ex:
+            logger.error('render_grid_to_map异常：{}', ex)
     else:
         logger.info("result json not found")
 
@@ -72,38 +73,53 @@ def render_to_map(dataset_json_path, result_json_path, background_id, map_save_p
         prediction = prediction.sum(axis=3)
         truth = truth.sum(axis=3)
     dif = prediction-truth
-    list_hm_pre = make_series_list(prediction, dataset_json_path)
-    list_hm_tru = make_series_list(truth, dataset_json_path)
-    list_hm_dif = make_series_list(dif, dataset_json_path)
+    list_hm_pre, geo_pre = make_series_list(prediction, dataset_json_path)
+    list_hm_tru, geo_tru = make_series_list(truth, dataset_json_path)
+    list_hm_dif, geo_dif = make_series_list(dif, dataset_json_path)
     m = folium.Map(
         location=return_location(dataset_json_content),
         tiles=get_background_url(background_id),
         zoom_start=12, attr='default'
     )
-    HeatMapWithTime(list_hm_pre, name='prediction').add_to(m)
-    HeatMapWithTime(list_hm_tru, name='truth').add_to(m)
-    HeatMapWithTime(list_hm_dif, name='difference').add_to(m)
-    folium.LayerControl().add_to(m)
+    colormap, gradient_map = get_colormap_gradient(geo_pre['features'], 'traffic_speed')
+    HeatMapWithTime(list_hm_tru, name='truth',min_opacity=1,
+                    radius=25, gradient=gradient_map).add_to(m)
+    HeatMapWithTime(list_hm_pre,name='prediction', min_opacity=1,
+                    radius=25, gradient=gradient_map).add_to(m)
+    HeatMapWithTime(list_hm_dif, name='difference', min_opacity=1,
+                    radius=25, gradient=gradient_map).add_to(m)
+    colormap.add_to(m)
+    for feature in geo_pre['features']:
+        make_map_only(feature, [], m, 'traffic_speed')
+    # folium.GeoJson(data=geo_pre, name='prediction').add_to(m)
+    folium.LayerControl(sortLayers=True).add_to(m)
     logger.info("The task result file was generated successfully, html path: " + map_save_path)
     m.save(map_save_path)
 
 
 def make_series_list(result, dataset_json_path):
+    # result [B,T,N,F] T个时间，N个位置，F个特征
     if result.ndim == 4:
         result = result.reshape(len(result), len(result[0]), len(result[0][0]))
     # result = result.reshape(len(result), len(result[0]), len(result[0][0]))
+    # 一共count_time个时间步和每个时间步geo_count个位置
     count_time = len(result[0])
     geo_count = len(result[0][0])
     result = np.array(result)
     result_mean1 = result.mean(axis=0)
+    geo_mean = result_mean1.mean(axis=0)
     heat_list = []
+    geo_list = []
     for i in result_mean1:
         time_list = []
         for j in i:
             item = [j]
             time_list.append(item)
         heat_list.append(time_list)
+    for e in geo_mean:
+        geo_list.append([e])
     view_json = json.load(open(dataset_json_path, 'r'))
+    # 将坐标和特征值组合
     for i in range(len(heat_list)):
         k = 0
         for _ in view_json['features']:
@@ -111,12 +127,22 @@ def make_series_list(result, dataset_json_path):
             # print(location)
             heat_list[i][k].insert(0, location[1])
             heat_list[i][k].insert(1, location[0])
-            print(heat_list[i][k])
             k += 1
+    index = 0
+    for feature in view_json['features']:
+        location = business.save_geojson.return_location(feature)
+        # print(location)
+        geo_list[index].insert(0, location[1])
+        geo_list[index].insert(1, location[0])
+        index += 1
     heat_time_list = []
+    # 在通过heat_list构造geojson、
+    geo = generate_geojson(geo_list)
+    # 二维heat_list降为一维heat_time_list
     for loc in range(len(heat_list[0])):
         for time in range(len(heat_list)):
             heat_time_list.append(heat_list[time][loc])
+    # 归一化
     heat_time_list = make_heat(heat_time_list)
     list_hm = []
     for i in range(count_time):
@@ -125,7 +151,20 @@ def make_series_list(result, dataset_json_path):
             list_k = heat_time_list[k * count_time:(k + 1) * count_time]
             list_item.append(list_k[i])
         list_hm.append(list_item)
-    return list_hm
+    return list_hm, geo
+
+
+def generate_geojson(geo_list):
+    # geo_list 207 * 3[lat, lng, speed]
+    # 构造geojson数据，经纬度要反转一下，特征值放properties里面
+    features = []
+    for e in geo_list:
+        # 是否特征值只有traffic_speed
+        properties = {'traffic_speed': float(e[2])}
+        point = geojson.Point((float(e[1]), float(e[0])))
+        feature_json = geojson.Feature(geometry=point, properties=properties)
+        features.append(feature_json)
+    return geojson.FeatureCollection(features)
 
 
 def render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path,dataset_dir):
