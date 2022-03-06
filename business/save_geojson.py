@@ -1,15 +1,14 @@
 from copy import copy
 from string import Template
-
+from pyecharts import options as opts
+from pyecharts.charts import Scatter, HeatMap as Heat_Statis
 import branca
 import folium
 import pandas as pd
 import json
 import os
-import altair as alt
 from django.conf import settings
-from folium.plugins import HeatMap, MarkerCluster
-
+from folium.plugins import HeatMap
 from business.enums import DatasetStatusEnum
 from common.utils import get_json_features, random_style
 from loguru import logger
@@ -131,28 +130,28 @@ def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
     csv_raw_data = []
     if tag2 is None:
         tag_name = tag1
-        i=0
+        i = 0
         for _ in view_json['features']:
             geo_id = _['properties']['geo_id']
             tag_value = _['properties'][tag1]
             csv_raw_data.append([geo_id, tag_value])
             i += 1
     else:
-        tag_name = 'sum_'+tag1+'_'+tag2
+        tag_name = 'total_' + tag1 + '_' + tag2
         i = 0
         for _ in view_json['features']:
             geo_id = _['properties']['geo_id']
-            tag_value = _['properties'][tag1]+_['properties'][tag2]
+            tag_value = _['properties'][tag1] + _['properties'][tag2]
             csv_raw_data.append([geo_id, tag_value])
             i += 1
     csv_column_name = ['geo_id', tag_name]
-    csv_pd = pd.DataFrame(columns=csv_column_name,data=csv_raw_data)
+    csv_pd = pd.DataFrame(columns=csv_column_name, data=csv_raw_data)
     csv_path = f"{url}" + os.sep + f"{file}" + '.csv'
-    csv_pd.to_csv(csv_path,index=False)
+    csv_pd.to_csv(csv_path, index=False)
     return csv_path
 
 
-def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None,name="choropleth"):
+def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth"):
     Choropleth_data = pd.read_csv(csv_url)
     if tag2 is None:
         print('choose 1')
@@ -172,12 +171,12 @@ def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None,name="choropleth"
             geo_data=state_geo,
             name=name,
             data=Choropleth_data,
-            columns=["geo_id", 'sum_'+tag1+'_'+tag2],
+            columns=["geo_id", 'total_' + tag1 + '_' + tag2],
             key_on="feature.id",
             fill_color="YlGn",
             fill_opacity=0.7,
             line_opacity=0.2,
-            legend_name='sum_'+tag1+'_'+tag2,
+            legend_name='total_' + tag1 + '_' + tag2,
         ).add_to(m)
 
 
@@ -245,12 +244,12 @@ def show_geo_view(url, json_file, file, background_id):
                     else:
                         make_map_double(_, heat, m, tag1='inflow', tag2='outflow')
                 heat_minmax = make_heat(heat)
-                csv_url = make_Choropleth_csv(view_json, file, url, tag1='inflow',tag2='outflow')
+                csv_url = make_Choropleth_csv(view_json, file, url, tag1='inflow', tag2='outflow')
                 try:
-                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow',tag2='outflow',name='Cor')
+                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow', tag2='outflow', name='Cor')
                 except Exception:
                     pass
-                HeatMap(heat_minmax,name='abs_flow_heatmap').add_to(m)
+                HeatMap(heat_minmax, name='total_flow_heatmap').add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
 
             elif 'features_properties_length' in feature_list:
@@ -345,29 +344,27 @@ def make_statis_only(data, file, tag, name, grid=False):
     """
     if not grid:
         try:
-            min_value = data.entity_id.min()
-            max_value = data.entity_id.max()
-            test_dict = {'id': [], name: []}
+            x_axis = []
+            value_dict = []
             for i in data.entity_id.unique():
                 tag_value = getattr(data, tag)[data.entity_id == int(i)].mean()
-                test_dict['id'].append(i)
-                test_dict[name].append(tag_value)
-                pass
-            form_statis_html(test_dict, name, min_value, max_value, file)
+                x_axis.append(str(i))
+                value_dict.append(round(tag_value,1))
+            form_statis_html(value_dict, x_axis, file, name1=name)
             file_view_status = DatasetStatusEnum.SUCCESS_stat.value
         except Exception:
             file_view_status = DatasetStatusEnum.ERROR.value
     else:
         try:
-            test_dict = {'id': [], name: []}
-            page_legth = 0
+            grid_pic_value = []
             for i in data.row_id.unique():
                 for j in data.column_id.unique():
-                    page_legth += 1
-                    tag_value = getattr(data, tag)[data.row_id == int(i)][data.column_id == int(j)].mean()
-                    test_dict['id'].append(f"{i}" + f", {j}")
-                    test_dict[name].append(tag_value)
-            form_long_statis_html(test_dict, name, page_legth, file)
+                    if name == 'risk':
+                        tag_value = (getattr(data, tag)[data.row_id == int(i)][data.column_id == int(j)].mean())*100
+                    else:
+                        tag_value = getattr(data, tag)[data.row_id == int(i)][data.column_id == int(j)].mean()
+                    grid_pic_value.append([int(i), int(j), tag_value])
+            form_grid_statis_html(grid_pic_value, name, file)
             file_view_status = DatasetStatusEnum.SUCCESS_stat.value
             logger.info('统计图象绘制完成')
         except Exception:
@@ -378,32 +375,27 @@ def make_statis_only(data, file, tag, name, grid=False):
 def make_statis_double(data, file, tag1, tag2, name, grid=False):
     if not grid:
         try:
-            min_value = data.entity_id.min()
-            max_value = data.entity_id.max()
-            test_dict = {'id': [], name: []}
+            x_axis = []
+            value_dict = [[],[]]
             for i in data.entity_id.unique():
                 tag1_value = getattr(data, tag1)[data.entity_id == int(i)].mean()
                 tag2_value = getattr(data, tag2)[data.entity_id == int(i)].mean()
-                test_dict['id'].append(i)
-                test_dict[name].append(tag1_value + tag2_value)
-                pass
-            form_statis_html(test_dict, name, min_value, max_value, file)
+                x_axis.append(str(i))
+                value_dict[0].append(round(tag1_value, 1))
+                value_dict[1].append(round(tag2_value, 1))
+            form_statis_html(value_dict, x_axis, file, name1=tag1, name2=tag2)
             file_view_status = DatasetStatusEnum.SUCCESS_stat.value
         except Exception:
             file_view_status = DatasetStatusEnum.ERROR.value
     else:
         try:
-            test_dict = {'id': [], name: []}
-            page_legth = 0
+            grid_pic_value = []
             for i in data.row_id.unique():
                 for j in data.column_id.unique():
-                    page_legth += 1
                     tag1_value = getattr(data, tag1)[data.row_id == int(i)][data.column_id == int(j)].mean()
                     tag2_value = getattr(data, tag2)[data.row_id == int(i)][data.column_id == int(j)].mean()
-                    test_dict['id'].append(f'{i},' + f'{j}')
-                    test_dict[name].append(tag1_value - tag2_value)
-                    pass
-            form_long_statis_html(test_dict, name, page_legth, file)
+                    grid_pic_value.append([int(i), int(j), tag1_value + tag2_value])
+            form_grid_statis_html(grid_pic_value, name, file)
             file_view_status = DatasetStatusEnum.SUCCESS_stat.value
             logger.info('统计图象绘制完成')
         except Exception:
@@ -421,16 +413,16 @@ def show_data_statis(url, file):
             logger.info('尝试绘制' + files + '文件的[dyna]统计图象')
             data = pd.read_csv(settings.DATASET_PATH + file + os.sep + files, index_col='dyna_id')
             if 'traffic_flow' in data:
-                file_view_status = make_statis_only(data, file, tag='traffic_flow', name='abs_traffic_flow')
+                file_view_status = make_statis_only(data, file, tag='traffic_flow', name='total_traffic_flow')
                 return file_view_status
             elif 'in_flow' in data and 'out_flow' in data:
-                file_view_status = make_statis_double(data, file, 'in_flow', 'out_flow', 'abs_flow')
+                file_view_status = make_statis_double(data, file, 'in_flow', 'out_flow', 'total_flow')
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'abs_flow')
+                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'total_flow')
                 return file_view_status
             elif 'pickup' in data and 'dropoff' in data:
-                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'abs_quantity')
+                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'total_quantity')
                 return file_view_status
             elif 'traffic_speed' in data:
                 file_view_status = make_statis_only(data, file, tag='traffic_speed', name='traffic_speed')
@@ -449,13 +441,16 @@ def show_data_statis(url, file):
                 file_view_status = make_statis_only(data, file, tag='risk', name='risk', grid=True)
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'abs_flow', grid=True)
+                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'total_flow', grid=True)
+                return file_view_status
+            elif 'new_flow' in data and 'end_flow' in data:
+                file_view_status = make_statis_double(data, file, 'new_flow', 'end_flow', 'new&end_flow', grid=True)
                 return file_view_status
             elif 'pickup' in data and 'dropoff' in data:
-                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'abs_quantity', grid=True)
+                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'total_quantity', grid=True)
                 return file_view_status
             elif 'departing_volume' in data and 'arriving_volume' in data:
-                file_view_status = make_statis_double(data, file, 'departing_volume', 'arriving_volume', 'abs_volume',
+                file_view_status = make_statis_double(data, file, 'departing_volume', 'arriving_volume', 'total_volume',
                                                       grid=True)
                 return file_view_status
             else:
@@ -463,35 +458,75 @@ def show_data_statis(url, file):
                 return file_view_status
 
 
-def form_statis_html(test_dict, asix_y, min_value, max_value, file):
+def form_statis_html(value_dict, asix_x, file, name1=None, name2=None):
     """
     根据统计数据形成一个固定宽度的html页面
     """
-    test_dict_df = pd.DataFrame(test_dict)
-    chart = alt.Chart(test_dict_df, title='Mean of ' + f"{asix_y}" + ' on timeseries').mark_point().encode(
-        x=alt.X('id', scale=alt.Scale(domain=[min_value, max_value])),
-        y=asix_y,
-    ).properties(
-        width=1000
-    ).interactive()
-    chart.save(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html")
+    if name2 is None:
+        pic = (Scatter()
+        .add_xaxis(asix_x)
+        .add_yaxis("mean of " + name1, value_dict,label_opts=opts.LabelOpts(is_show=False),)
+        .set_global_opts(
+            title_opts=opts.TitleOpts(title=str("mean of " + name1),subtitle="Keep 1 decimal place (0.1)",),
+            xaxis_opts=opts.AxisOpts(name='geo_id', splitline_opts=opts.SplitLineOpts(is_show=True)),
+            yaxis_opts=opts.AxisOpts(name='value of '+name1,splitline_opts=opts.SplitLineOpts(is_show=True)),
+            toolbox_opts=opts.ToolboxOpts(
+                is_show=True,
+                orient="vertical",
+                pos_left="90%",
+        ))
+        .render(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"))
+    else:
+        pic = (Scatter()
+        .add_xaxis(asix_x)
+        .add_yaxis("mean of " + name1, value_dict[0], label_opts=opts.LabelOpts(is_show=False),)
+        .add_yaxis("mean of " + name2, value_dict[1], label_opts=opts.LabelOpts(is_show=False), )
+        .set_global_opts(
+            title_opts=opts.TitleOpts(title=str("mean of " + name1 + ' & ' + name2),subtitle="Keep 1 decimal place (0.1)",pos_left = '80%',),
+            xaxis_opts=opts.AxisOpts(name='geo_id', splitline_opts=opts.SplitLineOpts(is_show=True)),
+            yaxis_opts=opts.AxisOpts(name=name1+' & '+name2+' value',splitline_opts=opts.SplitLineOpts(is_show=True)),
+            toolbox_opts=opts.ToolboxOpts(
+                is_show=True,
+                orient="vertical",
+                pos_left="90%",
+        ))
+        .render(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"))
 
 
-def form_long_statis_html(test_dict, asix_y, page_legth, file):
+def form_grid_statis_html(grid_pic_value, name, file):
     """
-    根据统计数据形成一个可变宽度的html页面
+    根据统计数据形成一个固定宽度的html页面
     """
-    test_dict_df = pd.DataFrame(test_dict)
-    interval = alt.selection_interval()
-    chart = alt.Chart(test_dict_df, title='Mean of ' + f"{asix_y}" + ' on timeseries').mark_point().encode(
-        x='id',
-        y=asix_y,
-    ).properties(
-        selection=interval,
-        width=page_legth * 20
+    # os.remove(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html")
+
+    list_x, list_y = [], []
+    for item in np.unique(np.array(grid_pic_value)[:, 0]):
+        list_x.append(str(item))
+    for item in np.unique(np.array(grid_pic_value)[:, 1]):
+        list_y.append(str(item))
+    if name == 'risk':
+        name = 'risk (%)'
+    pic = (
+        Heat_Statis()
+            .add_xaxis(list_x)
+            .add_yaxis(
+            name,
+            list_y,
+            grid_pic_value,
+        )
+            .set_global_opts(
+            yaxis_opts=opts.AxisOpts(name='grid_y'),
+            xaxis_opts=opts.AxisOpts(name='grid_x'),
+            title_opts=opts.TitleOpts(title="mean of "+name),
+            visualmap_opts=opts.VisualMapOpts(),
+            toolbox_opts=opts.ToolboxOpts(
+                is_show=True,
+                orient="vertical",
+                pos_left="90%",
+            ),
+        )
+            .render(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html")
     )
-    chart.save(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html")
-
 
 
 class VisHelper:
@@ -528,14 +563,14 @@ class VisHelper:
             try:
                 assert len(self.geo_file) == 1
             except Exception:
-                pass
+                logger.info('文件当中没有geo文件')
 
             # reserved columns
             self.geo_reserved_lst = ['type', 'coordinates']
             self.dyna_reserved_lst = ['dyna_id', 'type', 'time', 'entity_id', 'traj_id', 'coordinates']
             self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
         except Exception:
-            pass
+            logger.info('解析数据集失败，config文件无法识别或文件夹为空')
 
     def visualize(self):
         try:
@@ -543,19 +578,16 @@ class VisHelper:
                 # geo
                 try:
                     self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
-                except Exception:
-                    pass
-                try:
                     self._visualize_geo()
                 except Exception:
-                    pass
+                    logger.info('文件当中没有geo文件')
                 # dyna
                 for dyna_file in self.dyna_file:
                     try:
                         self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
                         self._visualize_dyna()
                     except Exception:
-                        pass
+                        logger.info('文件当中没有dyna文件或dyna文件生成失败')
             elif self.type == 'state':
                 self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
                 for dyna_file in self.dyna_file:
@@ -580,13 +612,14 @@ class VisHelper:
         geo_feature_lst = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
         dyna_feature_lst = [_ for _ in list(dyna_file.columns) if _ not in self.dyna_reserved_lst]
 
-        geojson_obj = self._visualize_state_normal(geo_file,dyna_file,geo_feature_lst,dyna_feature_lst,geojson_obj)
+        geojson_obj = self._visualize_state_normal(geo_file, dyna_file, geo_feature_lst, dyna_feature_lst, geojson_obj)
         ensure_dir(self.save_path)
         save_name = "_".join(self.dyna_path.split('/')[-1].split('.')) + '.json'
         json.dump(geojson_obj, open(self.save_path + '/' + save_name, 'w',
                                     encoding='utf-8'),
                   ensure_ascii=False, indent=4)
-    def _visualize_state_normal(self,geo_file,dyna_file,geo_feature_lst,dyna_feature_lst,geojson_obj):
+
+    def _visualize_state_normal(self, geo_file, dyna_file, geo_feature_lst, dyna_feature_lst, geojson_obj):
         for _, row in geo_file.iterrows():
             # get feature dictionary
             geo_id = row['geo_id']
@@ -605,7 +638,8 @@ class VisHelper:
             feature_i['geometry']['coordinates'] = eval(row['coordinates'])
             geojson_obj['features'].append(feature_i)
         return geojson_obj
-    def _visualize_state_time(self,geo_file,dyna_file,geo_feature_lst,dyna_feature_lst,geojson_obj):
+
+    def _visualize_state_time(self, geo_file, dyna_file, geo_feature_lst, dyna_feature_lst, geojson_obj):
         count_geo = dyna_file.shape[0]
         time_count = 0
         print(dyna_file.isnull().sum())
@@ -617,9 +651,6 @@ class VisHelper:
             feature_dct = row[geo_feature_lst].to_dict()
             # print(feature_dct)
             dyna_i = dyna_file[dyna_file['entity_id'] == geo_id]
-            # for f in dyna_feature_lst:
-            #     feature_dct[f] = dyna_i[f]
-            # 以下为测试热力图
             listi = []
 
             for f in dyna_feature_lst:
@@ -642,6 +673,7 @@ class VisHelper:
                     # print(feature_i)
                     geojson_obj['features'].append(feature_i)
         return geojson_obj
+
     def _visualize_grid(self):
         geo_file = pd.read_csv(self.geo_path, index_col=None)
         grid_file = pd.read_csv(self.grid_path, index_col=None)
@@ -702,33 +734,39 @@ class VisHelper:
         dyna_feature_lst = [_ for _ in list(dyna_file.columns) if _ not in self.dyna_reserved_lst]
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         GPS_traj = "coordinates" in dyna_file.columns
+        geo_file = None
         if self.geo_path is not None:
             geo_file = pd.read_csv(self.geo_path, index_col=None)
 
-        a = dyna_file.groupby("entity_id")
-        if not GPS_traj:
+        grouped_dyna_file = dyna_file.groupby("entity_id")
+        if not GPS_traj and geo_file is not None:
             i = 0
-            for entity_id, entity_value in a:
+            for entity_id, entity_value in grouped_dyna_file:
+                feature_i = None
                 if i < 3:
-                    feature_dct = {"usr_id": entity_id}
-                    feature_i = dict()
-                    feature_i['type'] = 'Feature'
-                    feature_i['properties'] = feature_dct
-                    feature_i['geometry'] = {}
-                    feature_i['geometry']['type'] = "LineString"
-                    feature_i['geometry']['coordinates'] = []
-                    for _, row in entity_value.iterrows():
-                        coor = eval(geo_file.loc[row['location']]['coordinates'])
-                        feature_i['geometry']['coordinates'].append(coor)
-                    i += 1
+                    try:
+                        feature_dct = {"usr_id": entity_id}
+                        feature_i = dict()
+                        feature_i['type'] = 'Feature'
+                        feature_i['properties'] = feature_dct
+                        feature_i['geometry'] = {}
+                        feature_i['geometry']['type'] = "LineString"
+                        feature_i['geometry']['coordinates'] = []
+                        for _, row in entity_value.iterrows():
+                            coor = eval(geo_file.loc[row['location'], 'coordinates'])
+                            feature_i['geometry']['coordinates'].append(coor)
+                        i += 1
+                    except Exception:
+                        logger.info('can not find this location')
                 else:
                     break
-                geojson_obj['features'].append(feature_i)
+                if len(feature_i['geometry']['coordinates']) > 0:
+                    geojson_obj['features'].append(feature_i)
         else:
             if "traj_id" in dyna_file.columns:
                 trajectory = {}
                 i = 0
-                for entity_id, entity_value in a:
+                for entity_id, entity_value in grouped_dyna_file:
                     if i < 3:
                         trajectory[entity_id] = {}
                         entity_value = entity_value.groupby("traj_id")
@@ -750,8 +788,7 @@ class VisHelper:
                         break
 
             else:
-                for entity_id, entity_value in a:
-                    feature_i = dict()
+                for entity_id, entity_value in grouped_dyna_file:
                     feature_dct = {"usr_id": entity_id}
                     feature_i = dict()
                     feature_i['type'] = 'Feature'
@@ -789,7 +826,7 @@ def get_geo_json(dataset, save_path):
         return file_form_status
     except Exception:
         file_form_status = DatasetStatusEnum.ERROR.value
-        print('file_form_status',file_form_status)
+        print('file_form_status', file_form_status)
         return file_form_status
 
 
@@ -823,3 +860,4 @@ def get_colormap_gradient(features, tag):
         gradient_map[res_values[i]] = color_map.rgb_hex_str(index_values[i])
     logger.info('gradient_map构造完毕：{}', gradient_map)
     return color_map, gradient_map
+
