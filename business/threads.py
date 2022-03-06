@@ -115,11 +115,11 @@ class ExecuteGeoViewThread(threading.Thread):
                 print(1234)
                 file_view_status = transfer_geo_json(self.extract_path + '_geo_json', self.file_name, self.background_id)
                 print(file_view_status)
-
-        except Exception:
+        except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
+            logger.error('ExecuteGeoViewThread transfer_geo_json 异常：{}', ex)
         # 处理完毕，更新数据集状态
-        if file_view_status == DatasetStatusEnum.SUCCESS.value or DatasetStatusEnum.SUCCESS_stat.value:
+        if file_view_status == DatasetStatusEnum.SUCCESS.value or file_view_status == DatasetStatusEnum.SUCCESS_stat.value:
             logger.info(self.file_name + "数据可视化处理完毕")
         else:
             logger.info(self.file_name + "数据可视化处理失败")

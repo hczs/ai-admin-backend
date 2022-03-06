@@ -247,11 +247,10 @@ def show_geo_view(url, json_file, file, background_id):
                 csv_url = make_Choropleth_csv(view_json, file, url, tag1='inflow', tag2='outflow')
                 try:
                     add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow', tag2='outflow', name='Cor')
-                except Exception:
-                    pass
+                except Exception as ex:
+                    logger.error('show_geo_view add_Choropleth 异常：{}', ex)
                 HeatMap(heat_minmax, name='total_flow_heatmap').add_to(m)
                 folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
-
             elif 'features_properties_length' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, m, 'length', mean_or_not=False)
@@ -312,8 +311,9 @@ def show_geo_view(url, json_file, file, background_id):
             m.save(geo_view_path)
             file_view_status = DatasetStatusEnum.SUCCESS.value
             logger.info(geo_layer + '文件的地理图象绘制成功')
-        except Exception:
+        except Exception as ex:
             file_view_status = show_data_statis(url, file)
+            logger.error('show_geo_view异常：{}', ex)
     else:
         file_view_status = show_data_statis(url, file)
     return file_view_status
@@ -327,10 +327,10 @@ def return_location(block):
     if len(block['geometry']['coordinates']) > 0:
         if type(block['geometry']['coordinates'][0]) is not list:
             location = block['geometry']['coordinates']
-        else:
+        elif len(block['geometry']['coordinates'][0]) > 0:
             if type(block['geometry']['coordinates'][0][0]) is not list:
                 location = block['geometry']['coordinates'][0]
-            else:
+            elif len(block['geometry']['coordinates'][0][0]) > 0:
                 if type(block['geometry']['coordinates'][0][0][0]) is not list:
                     location = block['geometry']['coordinates'][0][0]
                 else:
@@ -352,8 +352,9 @@ def make_statis_only(data, file, tag, name, grid=False):
                 value_dict.append(round(tag_value,1))
             form_statis_html(value_dict, x_axis, file, name1=name)
             file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-        except Exception:
+        except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
+            logger.error('make_statis_only: 统计图象绘制异常(not grid)：{}', ex)
     else:
         try:
             grid_pic_value = []
@@ -367,8 +368,9 @@ def make_statis_only(data, file, tag, name, grid=False):
             form_grid_statis_html(grid_pic_value, name, file)
             file_view_status = DatasetStatusEnum.SUCCESS_stat.value
             logger.info('统计图象绘制完成')
-        except Exception:
+        except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
+            logger.error('make_statis_only: 统计图象绘制异常(grid)：{}', ex)
     return file_view_status
 
 
@@ -385,8 +387,9 @@ def make_statis_double(data, file, tag1, tag2, name, grid=False):
                 value_dict[1].append(round(tag2_value, 1))
             form_statis_html(value_dict, x_axis, file, name1=tag1, name2=tag2)
             file_view_status = DatasetStatusEnum.SUCCESS_stat.value
-        except Exception:
+        except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
+            logger.error('make_statis_double: 统计图象绘制异常(not grid)：{}', ex)
     else:
         try:
             grid_pic_value = []
@@ -398,8 +401,9 @@ def make_statis_double(data, file, tag1, tag2, name, grid=False):
             form_grid_statis_html(grid_pic_value, name, file)
             file_view_status = DatasetStatusEnum.SUCCESS_stat.value
             logger.info('统计图象绘制完成')
-        except Exception:
+        except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
+            logger.error('make_statis_double: 统计图象绘制异常(grid)：{}', ex)
     return file_view_status
 
 
@@ -432,6 +436,7 @@ def show_data_statis(url, file):
                 return file_view_status
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
+                logger.error('show_data_statis dyna 未找到可绘制的属性：{}', data)
                 return file_view_status
         if files.count('grid') > 0:
             logger.info('尝试绘制' + files + '文件的[grid]统计图象')
@@ -453,8 +458,12 @@ def show_data_statis(url, file):
                 file_view_status = make_statis_double(data, file, 'departing_volume', 'arriving_volume', 'total_volume',
                                                       grid=True)
                 return file_view_status
+            elif 'flow' in data:
+                file_view_status = make_statis_only(data, file, tag='flow', name='flow', grid=True)
+                return file_view_status
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
+                logger.error('show_data_statis grid 未找到可绘制的属性：{}', data)
                 return file_view_status
 
 
@@ -563,14 +572,14 @@ class VisHelper:
             try:
                 assert len(self.geo_file) == 1
             except Exception:
-                logger.info('文件当中没有geo文件')
+                logger.error('文件当中没有geo文件')
 
             # reserved columns
             self.geo_reserved_lst = ['type', 'coordinates']
             self.dyna_reserved_lst = ['dyna_id', 'type', 'time', 'entity_id', 'traj_id', 'coordinates']
             self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
         except Exception:
-            logger.info('解析数据集失败，config文件无法识别或文件夹为空')
+            logger.error('解析数据集失败，config文件无法识别或文件夹为空')
 
     def visualize(self):
         try:
@@ -580,14 +589,14 @@ class VisHelper:
                     self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
                     self._visualize_geo()
                 except Exception:
-                    logger.info('文件当中没有geo文件')
+                    logger.error('文件当中没有geo文件')
                 # dyna
                 for dyna_file in self.dyna_file:
                     try:
                         self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
                         self._visualize_dyna()
                     except Exception:
-                        logger.info('文件当中没有dyna文件或dyna文件生成失败')
+                        logger.error('文件当中没有dyna文件或dyna文件生成失败')
             elif self.type == 'state':
                 self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
                 for dyna_file in self.dyna_file:
