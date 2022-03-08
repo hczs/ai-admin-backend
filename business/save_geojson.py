@@ -476,7 +476,7 @@ def form_statis_html(value_dict, asix_x, file, name1=None, name2=None):
         .add_xaxis(asix_x)
         .add_yaxis("mean of " + name1, value_dict,label_opts=opts.LabelOpts(is_show=False),)
         .set_global_opts(
-            title_opts=opts.TitleOpts(title=str("mean of " + name1),subtitle="Keep 1 decimal place (0.1)",),
+            title_opts=opts.TitleOpts(title=str("mean of " + name1),subtitle="Keep 1 decimal place (0.1)",pos_left='80%',),
             xaxis_opts=opts.AxisOpts(name='geo_id', splitline_opts=opts.SplitLineOpts(is_show=True)),
             yaxis_opts=opts.AxisOpts(name='value of '+name1,splitline_opts=opts.SplitLineOpts(is_show=True)),
             toolbox_opts=opts.ToolboxOpts(
@@ -491,7 +491,7 @@ def form_statis_html(value_dict, asix_x, file, name1=None, name2=None):
         .add_yaxis("mean of " + name1, value_dict[0], label_opts=opts.LabelOpts(is_show=False),)
         .add_yaxis("mean of " + name2, value_dict[1], label_opts=opts.LabelOpts(is_show=False), )
         .set_global_opts(
-            title_opts=opts.TitleOpts(title=str("mean of " + name1 + ' & ' + name2),subtitle="Keep 1 decimal place (0.1)",pos_left = '80%',),
+            title_opts=opts.TitleOpts(title=str("mean of " + name1 + ' & ' + name2),subtitle="Keep 1 decimal place (0.1)",pos_left='80%',),
             xaxis_opts=opts.AxisOpts(name='geo_id', splitline_opts=opts.SplitLineOpts(is_show=True)),
             yaxis_opts=opts.AxisOpts(name=name1+' & '+name2+' value',splitline_opts=opts.SplitLineOpts(is_show=True)),
             toolbox_opts=opts.ToolboxOpts(
@@ -589,14 +589,14 @@ class VisHelper:
                     self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
                     self._visualize_geo()
                 except Exception:
-                    logger.error('文件当中没有geo文件')
+                    logger.error('（trajectory）：文件当中没有geo文件或geo文件解析失败')
                 # dyna
                 for dyna_file in self.dyna_file:
                     try:
                         self.dyna_path = self.raw_path + self.dataset + '/' + dyna_file
                         self._visualize_dyna()
                     except Exception:
-                        logger.error('文件当中没有dyna文件或dyna文件生成失败')
+                        logger.error('（trajectory）：文件当中没有dyna文件或dyna文件解析失败')
             elif self.type == 'state':
                 self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
                 for dyna_file in self.dyna_file:
