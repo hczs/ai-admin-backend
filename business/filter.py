@@ -32,7 +32,9 @@ class TaskFilter(FilterSet):
     task = django_filters.CharFilter(field_name='task')
     # 任务状态精确查询
     task_status = django_filters.CharFilter(field_name='task_status')
+    # 数据集模糊查询
+    dataset = django_filters.CharFilter(field_name='dataset', lookup_expr='icontains')
 
     class Meta:
         model = Task
-        fields = ['begin', 'end', 'task_name', 'task', 'task_status']
+        fields = ['begin', 'end', 'task_name', 'task', 'task_status', 'dataset']
