@@ -180,5 +180,5 @@ IN_PROGRESS = []
 COMPLETED = []
 
 # 日志记录
-logger.add("file_{time}.log", rotation="10 MB", encoding="utf-8")
+logger.add("./log/file_{time}.log", rotation="10 MB", encoding="utf-8")
 logger.info("base.py settings loading")
