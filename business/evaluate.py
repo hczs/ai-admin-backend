@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+from string import Template
 
 from django.conf import settings
 
@@ -10,18 +11,21 @@ from business.models import TrafficStatePredAndEta, MapMatching, TrajLocPred
 
 def evaluate_insert(task):
     """
-    指标数据入库
+    指标数据入库，指标文件名称固定：evaluate_template = Template("${task_id}_${model}_${dataset}.${suffix}")
 
     :param task: 评价指标所属任务对象
     """
     # 数据准备
-    file_dir = settings.EVALUATE_PATH_PREFIX + str(task.id) + settings.EVALUATE_PATH_SUFFIX
+    file_dir = settings.EVALUATE_PATH_PREFIX + str(task.exp_id) + settings.EVALUATE_PATH_SUFFIX
+    evaluate_template = Template("${task_id}_${model}_${dataset}")
+    evaluate_name = evaluate_template.safe_substitute(task_id=task.id, model=task.model,
+                                                      dataset=task.dataset)
     # 扫描文件夹下所有文件
     file_list = os.listdir(file_dir)
     for file in file_list:
-        if os.path.splitext(file)[1] == '.csv':
+        if os.path.splitext(file)[0] == evaluate_name and os.path.splitext(file)[1] == '.csv':
             csv_insert(file_dir + file, task)
-        if os.path.splitext(file)[1] == '.json':
+        if os.path.splitext(file)[0] == evaluate_name and os.path.splitext(file)[1] == '.json':
             json_insert(file_dir + file, task)
 
 

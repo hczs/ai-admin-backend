@@ -1,9 +1,11 @@
 import json
 import os
+import random
 import shutil
 import tempfile
 import time
 import zipfile
+from string import Template
 
 from django.conf import settings
 from django.core import serializers
@@ -187,13 +189,11 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         dataset = self.get_object()
         cur_file_name = dataset.file_name
-        logger.info('进行中的可视化任务: ')
-        logger.info(settings.IN_PROGRESS)
-        logger.info('已完成的可视化任务: ')
-        logger.info(settings.COMPLETED)
+        logger.info('进行中的可视化任务: {}', settings.IN_PROGRESS)
+        logger.info('已完成的可视化任务: {}', settings.COMPLETED)
         for file_name in settings.COMPLETED:
             if file_name == cur_file_name:
-                logger.info('可视化完成：' + file_name)
+                logger.info('可视化完成：{}', file_name)
                 # remove掉这一条记录
                 settings.COMPLETED.remove(file_name)
                 logger.info('after remove COMPLETED: {}', settings.COMPLETED)
@@ -233,10 +233,8 @@ class TaskViewSet(ModelViewSet):
         task = self.get_object()
         task_name = task.task_name
         cur_task_key = task.task_name + str(task.id)
-        logger.info('进行中的实验: ')
-        logger.info(settings.IN_PROGRESS)
-        logger.info('已完成的实验: ')
-        logger.info(settings.COMPLETED)
+        logger.info('进行中的实验: {}', settings.IN_PROGRESS)
+        logger.info('已完成的实验: {}', settings.COMPLETED)
         for task_key in settings.COMPLETED:
             if task_key == cur_task_key:
                 logger.info('实验执行完毕：' + task_name)
@@ -246,7 +244,7 @@ class TaskViewSet(ModelViewSet):
                     "task_name": task_name
                 }
                 return Response(status=status.HTTP_200_OK, data=res_data)
-        logger.info('实验暂未完成：' + task_name)
+        logger.info('实验暂未完成：{}', task_name)
         return Response(status=status.HTTP_202_ACCEPTED)
 
     @action(methods=['get'], detail=True)
@@ -258,17 +256,8 @@ class TaskViewSet(ModelViewSet):
         """
         task = self.get_object()
         if task.task_status == TaskStatusEnum.IN_PROGRESS.value:
-            file_list = os.listdir(settings.LOG_PATH)
-            # 按照时间排序文件列表
-            dir_list = sorted(file_list, key=lambda x: os.path.getmtime(os.path.join(settings.LOG_PATH, x)),
-                              reverse=True)
-            logger.info("按时间倒序排序后的日志文件列表: {}", dir_list)
-            log_file = settings.LOG_PATH
-            for file in dir_list:
-                if os.path.splitext(file)[0].split('-')[0] == str(task.id):
-                    log_file += file
-                    break
-            if log_file != settings.LOG_PATH:
+            log_file = task.log_file_name
+            if log_file is not None and os.path.isfile(log_file):
                 log_content = read_file_str(log_file)
                 return Response(log_content, status=status.HTTP_200_OK)
             else:
@@ -297,13 +286,10 @@ class TaskViewSet(ModelViewSet):
         下载指定任务的日志文件
         """
         task = self.get_object()
-        file_list = os.listdir(settings.LOG_PATH)
-        log_file = settings.LOG_PATH
-        for file in file_list:
-            if os.path.splitext(file)[0].split('-')[0] == str(task.id):
-                log_file += file
-                break
-        if log_file == settings.LOG_PATH:
+        log_file = task.log_file_name
+        if log_file is not None and os.path.isfile(log_file):
+            return generate_download_file(log_file)
+        else:
             # 证明没有对应日志文件，直接生成文件返回
             file_obj = tempfile.NamedTemporaryFile()
             file_obj.name = 'error.log'
@@ -313,8 +299,6 @@ class TaskViewSet(ModelViewSet):
             response_file['content_type'] = "application/octet-stream"
             response_file['Content-Disposition'] = 'attachment; filename=' + file_obj.name
             return response_file
-        else:
-            return generate_download_file(log_file)
 
     @action(methods=['get'], detail=True)
     def execute(self, request, *args, **kwargs):
@@ -329,7 +313,10 @@ class TaskViewSet(ModelViewSet):
         # 获取任务数据，组装命令
         task_param = ['task', 'model', 'dataset', 'config_file', 'saved_model', 'train', 'batch_size', 'train_rate',
                       'eval_rate', 'learning_rate', 'max_epoch', 'gpu', 'gpu_id']
-        str_command = 'python ' + settings.RUN_MODEL_PATH + ' --exp_id ' + str(task.pk)
+        # 如果exp_id没传入，就随机生成
+        if task.exp_id is None:
+            task.exp_id = int(random.SystemRandom().random() * 100000)
+        str_command = 'python ' + settings.RUN_MODEL_PATH + ' --exp_id ' + str(task.exp_id)
         for param in task_param:
             param_value = getattr(task, param)
             if param_value is not None:
@@ -415,6 +402,23 @@ class TaskViewSet(ModelViewSet):
         """
         task = self.get_object()
         return generate_download_file(task.config_file)
+
+    @renderer_classes((PassthroughRenderer,))
+    @action(methods=['get'], detail=True)
+    def download_task_model(self, request, *args, **kwargs):
+        # 找到模型位置路径在exp_id / model_cache / *.m
+        # 模型名称 model_dataset.m
+        task = self.get_object()
+        file_dir = settings.EVALUATE_PATH_PREFIX + str(task.exp_id) + os.sep + 'model_cache' + os.sep
+        model_name = task.model + '_' + task.dataset + '.m'
+        file_list = os.listdir(file_dir)
+        model_file_path = None
+        for file in file_list:
+            if file == model_name:
+                model_file_path = file_dir + file
+        if model_file_path:
+            return generate_download_file(model_file_path)
+        return Response(status=status.HTTP_404_NOT_FOUND)
 
     @action(methods=['get'], detail=True)
     def get_result(self, request, *args, **kwargs):
@@ -653,16 +657,21 @@ class TrafficStateEtaViewSet(ModelViewSet):
     def download(self, request, *args, **kwargs):
         """
         指定任务指定指标文件下载
+        指标文件名匹配规则：evaluate_template = Template("${task_id}_${model}_${dataset}.${suffix}")
         """
         task_id = request.query_params.get('task')
+        task = Task.objects.get(id=task_id)
+        evaluate_template = Template("${task_id}_${model}_${dataset}")
+        evaluate_name = evaluate_template.safe_substitute(task_id=task.id, model=task.model,
+                                                                 dataset=task.dataset)
         # 根据id找到对应指标文件
         # 数据准备
-        file_dir = settings.EVALUATE_PATH_PREFIX + str(task_id) + settings.EVALUATE_PATH_SUFFIX
+        file_dir = settings.EVALUATE_PATH_PREFIX + str(task.exp_id) + settings.EVALUATE_PATH_SUFFIX
         if os.path.isdir(file_dir):
             # 扫描文件夹下所有文件
             file_list = os.listdir(file_dir)
             for file in file_list:
-                if os.path.splitext(file)[1] == '.csv' or os.path.splitext(file)[1] == '.json':
+                if os.path.splitext(file)[0] == evaluate_name:
                     file_path = file_dir + file
                     return generate_download_file(file_path)
         return Response(data={'detail': '指标文件不存在！'}, status=status.HTTP_400_BAD_REQUEST)

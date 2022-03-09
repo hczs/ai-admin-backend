@@ -1,4 +1,5 @@
 import os
+from string import Template
 
 import folium
 import numpy as np
@@ -7,6 +8,7 @@ import geojson
 from loguru import logger
 from django.conf import settings
 
+from business.models import Task
 from common.utils import return_location, get_background_url, random_style
 
 
@@ -29,17 +31,21 @@ def get_dyna_path(dataset_file):
     return None
 
 
-def get_result_path(task_id):
+def get_result_path(task):
     """
     获取任务结果文件npz的路径
+    任务结果文件结果名称固定：result_template = Template("${task_id}_${model}_${dataset}_result.${suffix}")
 
-    :param task_id: 任务id
+    :param task: 任务对象
     :return: 结果文件npz绝对路径
     """
-    result_dir = settings.EVALUATE_PATH_PREFIX + str(task_id) + settings.EVALUATE_PATH_SUFFIX
+    result_dir = settings.EVALUATE_PATH_PREFIX + str(task.exp_id) + settings.EVALUATE_PATH_SUFFIX
+    result_template = Template("${task_id}_${model}_${dataset}_result.${suffix}")
+    result_file_name = result_template.safe_substitute(task_id=task.id, model=task.model,
+                                               dataset=task.dataset, suffix='npz')
     file_list = os.listdir(result_dir)
     for file in file_list:
-        if file.endswith(".npz"):
+        if file == result_file_name:
             result_file_path = result_dir + file
             logger.info('the npz file path: ' + result_file_path)
             return result_file_path
@@ -47,18 +53,18 @@ def get_result_path(task_id):
     return None
 
 
-def eta_result_map(dataset_file, task_id, background_id):
+def eta_result_map(dataset_file, task, background_id):
     """
     到达时间估计，生成结果地图文件，文件名：数据集名称_task_id_result.html
 
     :param dataset_file: 数据集文件对象 对应表 tb_file
-    :param task_id: 任务id
+    :param task: 任务对象
     :param background_id: 地图底图id
     """
     # 获取dyna_path
     dyna_path = get_dyna_path(dataset_file)
     # 获取结果文件npz路径
-    npz_path = get_result_path(task_id)
+    npz_path = get_result_path(task)
     # 加载结果文件
     file_data = np.load(npz_path)
     prediction = file_data['prediction']
@@ -77,7 +83,7 @@ def eta_result_map(dataset_file, task_id, background_id):
     dyna_df = pd.read_csv(dyna_path)
     dyna_reserved_lst = ['dyna_id', 'type', 'time', 'entity_id', 'traj_id', 'coordinates']
     extra_feature = [_ for _ in list(dyna_df.columns) if _ not in dyna_reserved_lst]
-    map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task_id) + "_result.html"
+    map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task.exp_id) + "_result.html"
     # 绘制地图
     render_to_map(dyna_df=dyna_df,
                   result_traj_ids=result_traj_ids,

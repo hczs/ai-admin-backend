@@ -20,15 +20,15 @@ def generate_result_map(task):
     else:
         if task_type == TaskEnum.MAP_MATCHING.value:
             # 路网匹配
-            map_matching_show.matching_result_map(dataset, task.id, dataset.background_id)
+            map_matching_show.matching_result_map(dataset, task, dataset.background_id)
         elif task_type == TaskEnum.ROAD_REPRESENTATION.value:
             # 路网表征学习
-            road_learning_show.learning_result_map(dataset, task.id, dataset.background_id)
+            road_learning_show.learning_result_map(dataset, task, dataset.background_id)
         elif task_type == TaskEnum.TRAFFIC_STATE_PRED.value:
             # 交通状态预测
-            traffic_predict.matching_result_map(dataset, task.id, dataset.background_id)
+            traffic_predict.matching_result_map(dataset, task, dataset.background_id)
         elif task_type == TaskEnum.ETA.value:
             # 到达时间估计
-            eta_show.eta_result_map(dataset, task.id, dataset.background_id)
+            eta_show.eta_result_map(dataset, task, dataset.background_id)
         else:
             logger.error("generate_result_map: Unknown task type")

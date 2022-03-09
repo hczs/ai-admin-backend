@@ -9,11 +9,14 @@ https://docs.djangoproject.com/en/3.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
+import queue
 from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 from loguru import logger
+
+from business.handler import logCreateHandler
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -180,5 +183,8 @@ IN_PROGRESS = []
 COMPLETED = []
 
 # 日志记录
-logger.add("file_{time}.log", rotation="10 MB", encoding="utf-8")
+logger.add("./log/file_{time}.log", rotation="10 MB", encoding="utf-8")
 logger.info("base.py settings loading")
+
+# 全局日志队列，存放日志name，监控新增日志，从队列中取出set进入task对象
+LOG_QUEUE = queue.Queue()
