@@ -1,5 +1,7 @@
 import json
 import os
+from string import Template
+
 from pyecharts import options as opts
 from pyecharts.charts import Line, HeatMap as Heat_Statis
 import geojson
@@ -11,26 +13,30 @@ from loguru import logger
 import numpy as np
 
 import business.save_geojson
+from business.models import Task
 from business.save_geojson import make_heat, make_map_only, get_colormap_gradient
 from common.utils import return_location, get_background_url
 
 
-def matching_result_map(dataset_file, task_id, background_id):
+def matching_result_map(dataset_file, task, background_id):
     """
     交通预测，生成结果地图文件，文件名：数据集名称_task_id_result.html
 
     :param dataset_file: 数据集文件对象 对应表 tb_file
-    :param task_id: 任务id
+    :param task_id: 任务expid
     :param background_id: 地图底图id
     :return:
     """
     dataset_dir = dataset_file.extract_path
+    result_template = Template("${task_id}_${model}_${dataset}_result.${suffix}")
+    result_file_name = result_template.safe_substitute(task_id=task.id, model=task.model,
+                                                       dataset=task.dataset, suffix='npz')
     # 准备result.json
     result_json_path = None
-    result_dir = settings.EVALUATE_PATH_PREFIX + str(task_id) + settings.EVALUATE_PATH_SUFFIX
+    result_dir = settings.EVALUATE_PATH_PREFIX + str(task.exp_id) + settings.EVALUATE_PATH_SUFFIX
     file_list = os.listdir(result_dir)
     for file in file_list:
-        if file.endswith(".npz"):
+        if file == result_file_name:
             result_json_path = result_dir + file
     print(result_json_path)
     # 准备dataset dyna json
@@ -48,7 +54,7 @@ def matching_result_map(dataset_file, task_id, background_id):
     if result_json_path and dataset_json_path:
         logger.info("The result json path is: " + result_json_path)
         logger.info("The dataset json path is: " + dataset_json_path)
-        map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task_id) + "_result.html"
+        map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task.exp_id) + "_result.html"
         try:
             render_to_map(dataset_json_path, result_json_path, background_id, map_save_path, dataset_dir)
         except Exception as ex:
@@ -56,7 +62,7 @@ def matching_result_map(dataset_file, task_id, background_id):
     elif result_json_path and dataset_grid_json_path:
         logger.info("The result json path is: " + result_json_path)
         logger.info("The dataset grid json path is: " + dataset_grid_json_path)
-        map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task_id) + "_result.html"
+        map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task.exp_id) + "_result.html"
         try:
             render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path, dataset_dir)
         except Exception as ex:

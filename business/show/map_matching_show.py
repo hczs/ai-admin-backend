@@ -1,29 +1,34 @@
 import json
 import os
+from string import Template
 
 from django.conf import settings
 import folium
 from loguru import logger
 
+from business.models import Task
 from common.utils import return_location, get_background_url, red_style
 
 
-def matching_result_map(dataset_file, task_id, background_id):
+def matching_result_map(dataset_file, task, background_id):
     """
     路网匹配，生成结果地图文件，文件名：数据集名称_task_id_result.html
 
     :param dataset_file: 数据集文件对象 对应表 tb_file
-    :param task_id: 任务id
+    :param task_id: 任务expid
     :param background_id: 地图底图id
     :return:
     """
     dataset_dir = dataset_file.extract_path
     # 准备result.json
     result_json_path = None
-    result_dir = settings.EVALUATE_PATH_PREFIX + str(task_id) + settings.EVALUATE_PATH_SUFFIX
+    result_dir = settings.EVALUATE_PATH_PREFIX + str(task.exp_id) + settings.EVALUATE_PATH_SUFFIX
+    result_template = Template("${task_id}_${model}_${dataset}_result.${suffix}")
+    result_file_name = result_template.safe_substitute(task_id=task.id, model=task.model,
+                                                       dataset=task.dataset, suffix='json')
     file_list = os.listdir(result_dir)
     for file in file_list:
-        if file.endswith("result.json"):
+        if file == result_file_name:
             result_json_path = result_dir + file
     # 准备dataset dyna json
     dataset_dir = dataset_dir + "_geo_json"
@@ -36,7 +41,7 @@ def matching_result_map(dataset_file, task_id, background_id):
     if result_json_path and dataset_json_path:
         logger.info("The result json path is: " + result_json_path)
         logger.info("The dataset json path is: " + dataset_json_path)
-        map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task_id) + "_result.html"
+        map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task.exp_id) + "_result.html"
         render_to_map(dataset_json_path, result_json_path, background_id, map_save_path)
     else:
         logger.error("result json not found")
