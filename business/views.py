@@ -120,6 +120,12 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         # 启动执行任务线程，使用原子文件生成json
         ExecuteGeojsonThread(extract_path, file_name).start()
 
+    @action(methods=['get'], detail=True)
+    def generate_geo_json(self, *args, **kwargs):
+        dataset = self.get_object()
+        ExecuteGeojsonThread(dataset.extract_path, dataset.file_name).start()
+        return Response(status=status.HTTP_200_OK)
+
     def perform_destroy(self, instance):
         # 删除记录前先检查是否有实验正在使用此数据集，如果有就提示不能删除
         dataset = self.get_object()
