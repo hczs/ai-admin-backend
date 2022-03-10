@@ -176,7 +176,7 @@ class ExecuteGeojsonThread(threading.Thread):
             # 处理完毕，更新数据集状态
             file_obj.dataset_status = file_view_status
         else:
-            logger.info(self.file_name + '无法生成geojson文件')
+            logger.error(self.file_name + '无法生成geojson文件')
             file_obj.dataset_status = file_form_status
         file_obj.save()
         settings.IN_PROGRESS.remove(self.file_name)
