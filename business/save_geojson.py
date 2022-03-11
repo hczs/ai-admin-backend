@@ -593,6 +593,7 @@ class VisHelper:
                 self.type = 'od'
             else:
                 self.type = 'trajectory'
+            logger.info('数据集类型: {}', self.type)
             # get geo and dyna files
             all_files = os.listdir(self.raw_path + self.dataset)
             self.geo_file = []
@@ -673,7 +674,7 @@ class VisHelper:
             return self.file_form_status
 
     def _visualize_state(self):
-        geo_file = pd.read_csv(self.geo_path, index_col=None)
+        geo_file = pd.read_csv(self.geo_path, index_col=None, nrows=500)
         dyna_file = pd.read_csv(self.dyna_path, index_col=None)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
 
@@ -703,8 +704,14 @@ class VisHelper:
             feature_i['id'] = geo_id
             feature_i['properties'] = feature_dct
             feature_i['geometry'] = {}
-            feature_i['geometry']['type'] = row['type']
-            feature_i['geometry']['coordinates'] = eval(row['coordinates'])
+            coordinates = eval(row['coordinates'])
+            # 判断坐标是否是只有一个点LineString
+            if len(coordinates) == 1 and type(coordinates[0]) == list:
+                feature_i['geometry']['type'] = 'Point'
+                feature_i['geometry']['coordinates'] = coordinates[0]
+            else:
+                feature_i['geometry']['type'] = row['type']
+                feature_i['geometry']['coordinates'] = eval(row['coordinates'])
             geojson_obj['features'].append(feature_i)
         return geojson_obj
 
@@ -964,9 +971,9 @@ def get_geo_json(dataset, save_path):
         helper = VisHelper(dataset, save_path)
         file_form_status = helper.visualize()
         return file_form_status
-    except Exception:
+    except Exception as ex:
         file_form_status = DatasetStatusEnum.ERROR.value
-        print('file_form_status', file_form_status)
+        logger.error('get_geo_json生成geojson出现异常：{}', ex)
         return file_form_status
 
 

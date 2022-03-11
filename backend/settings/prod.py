@@ -1,6 +1,8 @@
 import os
 
 from .base import *
+from watchdog.observers import Observer
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -54,3 +56,14 @@ TASK_PARAM_PATH = LIBCITY_PATH + os.sep
 DATASET_EXAMPLE_PATH = '/usr/local/ai/sample/METR_LA.zip'
 TASK_PARAM_EXAMPLE_PATH = '/usr/local/ai/sample/config.json'
 ADMIN_FRONT_HTML_PATH = "/usr/local/nginx/html/ai-admin/dist/"
+
+# 判断目录是否存在，不存在则创建
+if not os.path.isdir(LOG_PATH):
+    logger.info('日志目录不存在，正在创建: {}', LOG_PATH)
+    os.makedirs(LOG_PATH)   # 可生成多层目录
+
+# 监控libcity的log目录
+observer = Observer()
+observer.schedule(logCreateHandler(), LOG_PATH)
+observer.start()
+logger.info('LOG_PATH监控线程已启动，LOG_PATH: {}', LOG_PATH)

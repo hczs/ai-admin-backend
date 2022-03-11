@@ -48,6 +48,8 @@ class Task(BaseModel):
     max_epoch = models.IntegerField(null=True)
     gpu = models.BooleanField(null=True)
     gpu_id = models.IntegerField(null=True)
+    exp_id = models.IntegerField(null=True)
+    log_file_name = models.CharField(max_length=255, null=True)
 
     class Meta:
         verbose_name = '任务'
