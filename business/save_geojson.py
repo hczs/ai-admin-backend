@@ -31,6 +31,9 @@ def transfer_geo_json(url, file, background_id):
         elif json_file.count('grid') > 0:
             file_view_status = show_geo_view(url, json_file, file, background_id)
             return file_view_status
+        elif json_file.count('od') > 0:
+            file_view_status = show_geo_view(url, json_file, file, background_id)
+            return file_view_status
         elif json_file.count('geo') > 0:
             file_view_status = show_geo_view(url, json_file, file, background_id)
             return file_view_status
@@ -576,12 +579,16 @@ def form_grid_statis_html(grid_pic_value, name, file):
 class VisHelper:
     def __init__(self, dataset, save_path):
         try:
-            self.raw_path = settings.DATASET_PATH
+            self.raw_path = 'D:\\PycharmProjects\\Bigscity-LibCity-master'+ os.sep + 'raw_data\\'# settings.DATASET_PATH
+            print(self.raw_path)
             self.dataset = dataset
+            print(self.dataset)
             self.save_path = save_path
+            print(self.save_path)
             self.file_form_status = DatasetStatusEnum.ERROR.value
             # get type
             self.config_path = self.raw_path + self.dataset + os.sep + 'config.json'
+            print( self.config_path)
             self.data_config = json.load(open(self.config_path, 'r'))
             if 'dyna' in self.data_config and ['state'] == self.data_config['dyna']['including_types']:
                 self.type = 'state'
@@ -823,7 +830,7 @@ class VisHelper:
 
 
     def _visualize_od(self):
-        geo_file = pd.read_csv(self.geo_path, index_col=None,nrows =2)
+        geo_file = pd.read_csv(self.geo_path, index_col=None, nrows=3)
         od_file = dd.read_csv(self.od_path)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         # get feature_lst
@@ -1008,3 +1015,24 @@ def get_colormap_gradient(features, tag):
     logger.info('gradient_map构造完毕：{}', gradient_map)
     return color_map, gradient_map
 
+if __name__ == '__main__':
+    file = 'NYC_TOD'
+    background_id = 7
+    extract_path = 'D:\\PycharmProjects\\Bigscity-LibCity-master\\raw_data\\NYC_TOD'
+    file_form_status = get_geo_json(file, extract_path + '_geo_json')
+    # url = extract_path + '_geo_json'
+    # for json_file in os.listdir(url):
+    #     if json_file.count('dyna') > 0:
+    #         if json_file.count('_truth_dyna') > 0:
+    #             pass
+    #         else:
+    #             file_view_status = show_geo_view(url, json_file, file, background_id)
+    #     elif json_file.count('grid') > 0:
+    #         file_view_status = show_geo_view(url, json_file, file, background_id)
+    #     elif json_file.count('od') > 0:
+    #         file_view_status = show_geo_view(url, json_file, file, background_id)
+    #     elif json_file.count('geo') > 0:
+    #         file_view_status = show_geo_view(url, json_file, file, background_id)
+    #     else:
+    #         file_view_status = show_data_statis(url, file)
+    # print(file_view_status)
