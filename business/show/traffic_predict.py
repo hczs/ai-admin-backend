@@ -340,6 +340,7 @@ def render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, 
         m.save(map_save_path)
     except Exception:
         name_list = return_data_names(dataset_dir)
+        print(name_list)
         pre = ((prediction.mean(axis=0)).mean(axis=0)).mean(axis=2)
         grid_pic_value_pre = []
         tru = ((truth.mean(axis=0)).mean(axis=0)).mean(axis=2)

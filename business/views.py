@@ -55,7 +55,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # 有些zip当中存在其他类型文件（如.grid），需要核实
-        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid', '.gridod']
+        atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid', '.gridod', '.od']
         my_file = self.request.FILES.get('dataset', None)
         if not my_file:
             return Response(data={'detail': '未检测到文件！'}, status=status.HTTP_400_BAD_REQUEST)
