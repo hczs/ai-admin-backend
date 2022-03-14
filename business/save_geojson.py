@@ -158,7 +158,7 @@ def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
 def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth"):
     Choropleth_data = pd.read_csv(csv_url)
     if tag2 is None:
-        print('choose 1')
+        logger.info('only one tag provided,will use this tag to search csv')
         folium.Choropleth(
             geo_data=state_geo,
             name=name,
@@ -225,7 +225,7 @@ def show_geo_view(url, json_file, file, background_id):
             )
             # 去除点聚合
             # marker_cluster = MarkerCluster(name='Cluster').add_to(m)
-            print(background_url)
+            logger.info('background select:'+background_url)
             #   所有可能的展示组合
             #   features_properties_traffic_speed
             #   features_properties_inflow, features_properties_outflow

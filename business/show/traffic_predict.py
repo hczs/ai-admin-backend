@@ -79,9 +79,7 @@ def render_to_map(dataset_json_path, result_json_path, background_id, map_save_p
     try:
         return_location(dataset_json_content)
         if prediction.ndim == 5:
-            print(123)
             name_list = return_data_names(dataset_dir)
-            print(456)
             pre = ((prediction.mean(axis=0)).mean(axis=0)).mean(axis=1).reshape(-1)
             tru = ((truth.mean(axis=0)).mean(axis=0)).mean(axis=1).reshape(-1)
             # dif = ((dif.mean(axis=0)).mean(axis=0)).mean(axis=1).reshape(-1)
@@ -525,9 +523,9 @@ def make_cor(data, m, dataset_json_content, dataset_dir, name):
 # map_save_path = 'D:/PycharmProjects/Bigscity-LibCity-master/test_result_statis3.html'
 # dataset_dir = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYCBike20140409_geo_json'
 
-dataset_grid_json_path = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYC_TOD_geo_json/NYC_TOD_gridod.json'
-result_json_path = 'D:/PycharmProjects/Bigscity-LibCity-master/libcity/cache/2021_11_22_16_41_52_GEML_NYC_TOD_predictions.npz'
-background_id = 1
-map_save_path = 'D:/PycharmProjects/Bigscity-LibCity-master/test_result_statis5.html'
-dataset_dir = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYC_TOD_geo_json'
-render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path, dataset_dir)
+# dataset_grid_json_path = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYC_TOD_geo_json/NYC_TOD_gridod.json'
+# result_json_path = 'D:/PycharmProjects/Bigscity-LibCity-master/libcity/cache/2021_11_22_16_41_52_GEML_NYC_TOD_predictions.npz'
+# background_id = 1
+# map_save_path = 'D:/PycharmProjects/Bigscity-LibCity-master/test_result_statis5.html'
+# dataset_dir = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYC_TOD_geo_json'
+# render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path, dataset_dir)
