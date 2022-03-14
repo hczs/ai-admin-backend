@@ -247,7 +247,8 @@ class TaskViewSet(ModelViewSet):
                 # remove掉这一条记录
                 settings.COMPLETED.remove(task_key)
                 res_data = {
-                    "task_name": task_name
+                    "task_name": task_name,
+                    "task_status": task.task_status
                 }
                 return Response(status=status.HTTP_200_OK, data=res_data)
         logger.info('实验暂未完成：{}', task_name)
