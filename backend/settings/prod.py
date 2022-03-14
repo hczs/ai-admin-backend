@@ -37,7 +37,7 @@ CORS_ALLOW_CREDENTIALS = True
 # libcity程序目录
 LIBCITY_PATH = '/root/Bigscity-LibCity'
 # 指标文件目录
-EVALUATE_PATH_PREFIX = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'cache'
+EVALUATE_PATH_PREFIX = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'cache' + os.sep
 EVALUATE_PATH_SUFFIX = os.sep + 'evaluate_cache' + os.sep
 # run_model.py脚本文件位置
 RUN_MODEL_PATH = 'run_model.py'
