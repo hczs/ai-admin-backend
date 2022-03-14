@@ -294,6 +294,7 @@ class TaskViewSet(ModelViewSet):
         """
         task = self.get_object()
         log_file = task.log_file_name
+        logger.info('日志文件地址：{}', log_file)
         if log_file is not None and os.path.isfile(log_file):
             return generate_download_file(log_file)
         else:
@@ -674,10 +675,13 @@ class TrafficStateEtaViewSet(ModelViewSet):
         # 根据id找到对应指标文件
         # 数据准备
         file_dir = settings.EVALUATE_PATH_PREFIX + str(task.exp_id) + settings.EVALUATE_PATH_SUFFIX
+        logger.info('指标文件夹路径：{}', file_dir)
         if os.path.isdir(file_dir):
             # 扫描文件夹下所有文件
             file_list = os.listdir(file_dir)
             for file in file_list:
+                logger.info('os.path.splitext(file)[0]: {} and evaluate_name: {}',
+                            os.path.splitext(file)[0], evaluate_name)
                 if os.path.splitext(file)[0] == evaluate_name:
                     file_path = file_dir + file
                     return generate_download_file(file_path)
