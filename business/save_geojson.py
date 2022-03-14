@@ -2,6 +2,7 @@ from copy import copy
 from string import Template
 from pyecharts import options as opts
 from pyecharts.charts import Scatter, HeatMap as Heat_Statis
+import dask.dataframe as dd
 import branca
 import folium
 import pandas as pd
@@ -28,6 +29,9 @@ def transfer_geo_json(url, file, background_id):
                 file_view_status = show_geo_view(url, json_file, file, background_id)
                 return file_view_status
         elif json_file.count('grid') > 0:
+            file_view_status = show_geo_view(url, json_file, file, background_id)
+            return file_view_status
+        elif json_file.count('od') > 0:
             file_view_status = show_geo_view(url, json_file, file, background_id)
             return file_view_status
         elif json_file.count('geo') > 0:
@@ -154,7 +158,7 @@ def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
 def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth"):
     Choropleth_data = pd.read_csv(csv_url)
     if tag2 is None:
-        print('choose 1')
+        logger.info('only one tag provided,will use this tag to search csv')
         folium.Choropleth(
             geo_data=state_geo,
             name=name,
@@ -221,7 +225,7 @@ def show_geo_view(url, json_file, file, background_id):
             )
             # 去除点聚合
             # marker_cluster = MarkerCluster(name='Cluster').add_to(m)
-            print(background_url)
+            logger.info('background select:'+background_url)
             #   所有可能的展示组合
             #   features_properties_traffic_speed
             #   features_properties_inflow, features_properties_outflow
@@ -250,6 +254,18 @@ def show_geo_view(url, json_file, file, background_id):
                 except Exception as ex:
                     logger.error('show_geo_view add_Choropleth 异常：{}', ex)
                 HeatMap(heat_minmax, name='total_flow_heatmap').add_to(m)
+                folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
+            elif 'features_properties_flow' in feature_list:
+                for _ in view_json['features']:
+                    if _['geometry']['type'] == 'MultiPolygon':
+                        pass
+                    else:
+                        make_map_only(_, heat, m, tag='flow')
+                csv_url = make_Choropleth_csv(view_json, file, url, tag1='flow')
+                try:
+                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='flow', name='Choropleth of outflow')
+                except Exception as ex:
+                    logger.error('show_geo_view add_Choropleth 异常：{}', ex)
                 folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
             elif 'features_properties_length' in feature_list:
                 for _ in view_json['features']:
@@ -338,11 +354,11 @@ def return_location(block):
     return location
 
 
-def make_statis_only(data, file, tag, name, grid=False):
+def make_statis_only(data, file, tag, name, grid=False, gridod=False):
     """
     利用只有一个参数，获取统计图象
     """
-    if not grid:
+    if not grid and not gridod:
         try:
             x_axis = []
             value_dict = []
@@ -355,7 +371,7 @@ def make_statis_only(data, file, tag, name, grid=False):
         except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
             logger.error('make_statis_only: 统计图象绘制异常(not grid)：{}', ex)
-    else:
+    elif grid:
         try:
             grid_pic_value = []
             for i in data.row_id.unique():
@@ -371,6 +387,22 @@ def make_statis_only(data, file, tag, name, grid=False):
         except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
             logger.error('make_statis_only: 统计图象绘制异常(grid)：{}', ex)
+    elif gridod:
+        try:
+            grid_pic_value = []
+            for i in data.origin_row_id.unique():
+                for j in data.origin_column_id.unique():
+                    tag_value = getattr(data, tag)[data.origin_row_id == int(i)][data.origin_column_id == int(j)].mean().compute()
+                    grid_pic_value.append([int(i), int(j), tag_value])
+            form_grid_statis_html(grid_pic_value, name, file)
+            file_view_status = DatasetStatusEnum.SUCCESS_stat.value
+            logger.info('统计图象绘制完成')
+        except Exception as ex:
+            file_view_status = DatasetStatusEnum.ERROR.value
+            logger.error('make_statis_only: 统计图象绘制异常(gridod)：{}', ex)
+    else:
+        file_view_status = DatasetStatusEnum.ERROR.value
+        logger.error('make_statis_only: 统计图象绘制异常(grid)：{}')
     return file_view_status
 
 
@@ -438,7 +470,7 @@ def show_data_statis(url, file):
                 file_view_status = DatasetStatusEnum.ERROR.value
                 logger.error('show_data_statis dyna 未找到可绘制的属性：{}', data)
                 return file_view_status
-        if files.count('grid') > 0:
+        elif files.count('grid') > 0 and files.count('gridod') == 0:
             logger.info('尝试绘制' + files + '文件的[grid]统计图象')
             data = pd.read_csv(settings.DATASET_PATH + file + '/' + files, index_col='dyna_id')
             # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
@@ -464,6 +496,13 @@ def show_data_statis(url, file):
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
                 logger.error('show_data_statis grid 未找到可绘制的属性：{}', data)
+                return file_view_status
+        elif files.count('gridod') > 0:
+            logger.info('尝试绘制' + files + '文件的[gridod]统计图象')
+            data = dd.read_csv(settings.DATASET_PATH + file + '/' + files)
+            # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
+            if 'flow' in data:
+                file_view_status = make_statis_only(data, file, tag='flow', name='flow(daily)', gridod=True)
                 return file_view_status
 
 
@@ -498,8 +537,7 @@ def form_statis_html(value_dict, asix_x, file, name1=None, name2=None):
                 is_show=True,
                 orient="vertical",
                 pos_left="90%",
-        ))
-        .render(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"))
+        )).render(settings.ADMIN_FRONT_HTML_PATH + str(file) + ".html"))
 
 
 def form_grid_statis_html(grid_pic_value, name, file):
@@ -541,17 +579,25 @@ def form_grid_statis_html(grid_pic_value, name, file):
 class VisHelper:
     def __init__(self, dataset, save_path):
         try:
-            self.raw_path = settings.DATASET_PATH
+            self.raw_path = 'D:\\PycharmProjects\\Bigscity-LibCity-master'+ os.sep + 'raw_data\\'# settings.DATASET_PATH
+            print(self.raw_path)
             self.dataset = dataset
+            print(self.dataset)
             self.save_path = save_path
+            print(self.save_path)
             self.file_form_status = DatasetStatusEnum.ERROR.value
             # get type
             self.config_path = self.raw_path + self.dataset + os.sep + 'config.json'
+            print( self.config_path)
             self.data_config = json.load(open(self.config_path, 'r'))
             if 'dyna' in self.data_config and ['state'] == self.data_config['dyna']['including_types']:
                 self.type = 'state'
             elif 'grid' in self.data_config and ['state'] == self.data_config['grid']['including_types']:
                 self.type = 'grid'
+            elif 'gridod' in self.data_config and ['state'] == self.data_config['gridod']['including_types']:
+                self.type = 'gridod'
+            elif 'od' in self.data_config and ['state'] == self.data_config['od']['including_types']:
+                self.type = 'od'
             else:
                 self.type = 'trajectory'
             logger.info('数据集类型: {}', self.type)
@@ -563,6 +609,10 @@ class VisHelper:
             self.dyna_path = None
             self.grid_file = []
             self.grid_path = None
+            self.gridod_file = []
+            self.gridod_path = None
+            self.od_file = []
+            self.od_path = None
             for file in all_files:
                 if file.split('.')[1] == 'geo':
                     self.geo_file.append(file)
@@ -570,6 +620,10 @@ class VisHelper:
                     self.dyna_file.append(file)
                 if file.split('.')[1] == 'grid':
                     self.grid_file.append(file)
+                if file.split('.')[1] == 'gridod':
+                    self.gridod_file.append(file)
+                if file.split('.')[1] == 'od':
+                    self.od_file.append(file)
             try:
                 assert len(self.geo_file) == 1
             except Exception:
@@ -579,8 +633,11 @@ class VisHelper:
             self.geo_reserved_lst = ['type', 'coordinates']
             self.dyna_reserved_lst = ['dyna_id', 'type', 'time', 'entity_id', 'traj_id', 'coordinates']
             self.grid_reserved_lst = ['dyna_id', 'type', 'time', 'row_id', 'column_id']
+            self.od_reserved_lst = ['dyna_id', 'type', 'time', 'origin_id', 'destination_id']
+            self.gridod_reserved_lst = ['dyna_id', 'type', 'time', 'origin_row_id', 'origin_column_id', 'destination_row_id', 'destination_column_id']
         except Exception:
             logger.error('解析数据集失败，config文件无法识别或文件夹为空')
+
 
     def visualize(self):
         try:
@@ -608,6 +665,16 @@ class VisHelper:
                 for grid_file in self.grid_file:
                     self.grid_path = self.raw_path + self.dataset + '/' + grid_file
                     self._visualize_grid()
+            elif self.type == 'gridod':
+                self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
+                for gridod_file in self.gridod_file:
+                    self.gridod_path = self.raw_path + self.dataset + '/' + gridod_file
+                    self._visualize_gridod()
+            elif self.type == 'od':
+                self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
+                for od_file in self.od_file:
+                    self.od_path = self.raw_path + self.dataset + '/' + od_file
+                    self._visualize_od()
             self.file_form_status = DatasetStatusEnum.PROCESSING_COMPLETE.value
             return self.file_form_status
         except Warning:
@@ -724,8 +791,79 @@ class VisHelper:
                                     encoding='utf-8'),
                   ensure_ascii=False, indent=4)
 
+
+    def _visualize_gridod(self):
+        print(self.geo_path, self.gridod_path)
+        geo_file = pd.read_csv(self.geo_path, index_col=None,nrows =2)
+        gridod_file = dd.read_csv(self.gridod_path)
+        geojson_obj = {'type': "FeatureCollection", 'features': []}
+        # get feature_lst
+        geo_feature_lst = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
+        print(geo_feature_lst)
+        gridod_feature_lst = [_ for _ in list(gridod_file.columns) if _ not in self.gridod_reserved_lst]
+        print(gridod_feature_lst)
+        for _, row in geo_file.iterrows():
+            geo_id = row['geo_id']
+            # get feature dictionary origin_row_id', 'origin_column_id
+            row_id, column_id = row['row_id'], row['column_id']
+            feature_dct = row[geo_feature_lst].to_dict()
+            dyna_i = gridod_file[
+                (gridod_file['origin_row_id'] == row_id) & (gridod_file['origin_column_id'] == column_id)]
+            for f in gridod_feature_lst:
+                feature_dct[f] = float(dyna_i[f].mean().compute())
+
+            # form a feature
+            feature_i = dict()
+            feature_i['type'] = 'Feature'
+            feature_i['id'] = geo_id
+            feature_i['properties'] = feature_dct
+            feature_i['geometry'] = {}
+            feature_i['geometry']['type'] = row['type']
+            feature_i['geometry']['coordinates'] = eval(row['coordinates'])
+            geojson_obj['features'].append(feature_i)
+
+        ensure_dir(self.save_path)
+        save_name = "_".join(self.gridod_path.split('/')[-1].split('.')) + '.json'
+        json.dump(geojson_obj, open(self.save_path + '/' + save_name, 'w',
+                                    encoding='utf-8'),
+                  ensure_ascii=False, indent=4)
+
+
+    def _visualize_od(self):
+        geo_file = pd.read_csv(self.geo_path, index_col=None, nrows=3)
+        od_file = dd.read_csv(self.od_path)
+        geojson_obj = {'type': "FeatureCollection", 'features': []}
+        # get feature_lst
+        geo_feature_lst = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
+        print(geo_feature_lst)
+        od_feature_lst = [_ for _ in list(od_file.columns) if _ not in self.od_reserved_lst]
+        print(od_feature_lst)
+        for _, row in geo_file.iterrows():
+            # get feature dictionary
+            geo_id = row['geo_id']
+            feature_dct = row[geo_feature_lst].to_dict()
+            dyna_i = od_file[od_file['origin_id'] == geo_id]
+            for f in od_feature_lst:
+                feature_dct[f] = float(dyna_i[f].mean().compute())
+
+            # form a feature
+            feature_i = dict()
+            feature_i['type'] = 'Feature'
+            feature_i['id'] = geo_id
+            feature_i['properties'] = feature_dct
+            feature_i['geometry'] = {}
+            feature_i['geometry']['type'] = row['type']
+            feature_i['geometry']['coordinates'] = eval(row['coordinates'])
+            geojson_obj['features'].append(feature_i)
+
+        ensure_dir(self.save_path)
+        save_name = "_".join(self.od_path.split('/')[-1].split('.')) + '.json'
+        json.dump(geojson_obj, open(self.save_path + '/' + save_name, 'w',
+                                    encoding='utf-8'),
+                  ensure_ascii=False, indent=4)
+
     def _visualize_geo(self):
-        geo_file = pd.read_csv(self.geo_path, index_col=None)
+        geo_file = pd.read_csv(self.geo_path, index_col=None, nrows=2)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         extra_feature = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
         for _, row in geo_file.iterrows():
@@ -877,3 +1015,24 @@ def get_colormap_gradient(features, tag):
     logger.info('gradient_map构造完毕：{}', gradient_map)
     return color_map, gradient_map
 
+if __name__ == '__main__':
+    file = 'NYC_TOD'
+    background_id = 7
+    extract_path = 'D:\\PycharmProjects\\Bigscity-LibCity-master\\raw_data\\NYC_TOD'
+    file_form_status = get_geo_json(file, extract_path + '_geo_json')
+    # url = extract_path + '_geo_json'
+    # for json_file in os.listdir(url):
+    #     if json_file.count('dyna') > 0:
+    #         if json_file.count('_truth_dyna') > 0:
+    #             pass
+    #         else:
+    #             file_view_status = show_geo_view(url, json_file, file, background_id)
+    #     elif json_file.count('grid') > 0:
+    #         file_view_status = show_geo_view(url, json_file, file, background_id)
+    #     elif json_file.count('od') > 0:
+    #         file_view_status = show_geo_view(url, json_file, file, background_id)
+    #     elif json_file.count('geo') > 0:
+    #         file_view_status = show_geo_view(url, json_file, file, background_id)
+    #     else:
+    #         file_view_status = show_data_statis(url, file)
+    # print(file_view_status)

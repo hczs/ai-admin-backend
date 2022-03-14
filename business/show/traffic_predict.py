@@ -13,7 +13,7 @@ from loguru import logger
 import numpy as np
 
 import business.save_geojson
-from business.models import Task
+# from business.models import Task
 from business.save_geojson import make_heat, make_map_only, get_colormap_gradient
 from common.utils import return_location, get_background_url
 
@@ -76,35 +76,63 @@ def render_to_map(dataset_json_path, result_json_path, background_id, map_save_p
     file_data = np.load(result_json_path)
     prediction = file_data['prediction']
     truth = file_data['truth']
-    dif = prediction - truth
     try:
         return_location(dataset_json_content)
-        if len(prediction[0][0][0]) == 2:
-            prediction = prediction.sum(axis=3)
-            truth = truth.sum(axis=3)
-        list_hm_pre, geo_pre = make_series_list(prediction, dataset_json_path)
-        list_hm_tru, geo_tru = make_series_list(truth, dataset_json_path)
-        list_hm_dif, geo_dif = make_series_list(dif, dataset_json_path)
-        m = folium.Map(
-            location=return_location(dataset_json_content),
-            tiles=get_background_url(background_id),
-            zoom_start=12, attr='default'
-        )
-        colormap, gradient_map = get_colormap_gradient(geo_pre['features'], 'traffic_speed')
-        HeatMapWithTime(list_hm_tru, name='truth', min_opacity=1,
-                        radius=25, gradient=gradient_map).add_to(m)
-        HeatMapWithTime(list_hm_pre, name='prediction', min_opacity=1,
-                        radius=25, gradient=gradient_map).add_to(m)
-        HeatMapWithTime(list_hm_dif, name='difference', min_opacity=1,
-                        radius=25, gradient=gradient_map).add_to(m)
-        colormap.add_to(m)
-        for feature in geo_pre['features']:
-            make_map_only(feature, [], m, 'traffic_speed')
-        # folium.GeoJson(data=geo_pre, name='prediction').add_to(m)
-        folium.LayerControl(sortLayers=True).add_to(m)
-        logger.info("The task result file was generated successfully, html path: " + map_save_path)
-        m.save(map_save_path)
+        if prediction.ndim == 5:
+            name_list = return_data_names(dataset_dir)
+            pre = ((prediction.mean(axis=0)).mean(axis=0)).mean(axis=1).reshape(-1)
+            tru = ((truth.mean(axis=0)).mean(axis=0)).mean(axis=1).reshape(-1)
+            # dif = ((dif.mean(axis=0)).mean(axis=0)).mean(axis=1).reshape(-1)
+            value1_list_pre, value1_list_truth= [], []
+            for item in pre:
+                value1_list_pre.append(int(item))
+            for item in tru:
+                value1_list_truth.append(int(item))
+            # for item in dif:
+            #     value1_list_dif.append(int(item))
+            value_dict = [value1_list_pre, value1_list_truth]
+            try:
+                asix_x = []
+                for i in range(len(pre)):
+                    asix_x.append(str(i))
+                print(value_dict[0], len(value_dict[0]))
+                print(name_list)
+                print(asix_x)
+                form_line_statis(value_dict, asix_x, map_save_path, name_list)
+                logger.info('结果统计图象html已经生成')
+            except Exception:
+                logger.info('结果统计图象html生成失败')
+        else:
+            dif = prediction - truth
+            if len(prediction[0][0][0]) == 2:
+                dif = prediction - truth
+                prediction = prediction.sum(axis=3)
+                truth = truth.sum(axis=3)
+                dif = dif.sum(axis=3)
+            list_hm_pre, geo_pre = make_series_list(prediction, dataset_json_path)
+            list_hm_tru, geo_tru = make_series_list(truth, dataset_json_path)
+            list_hm_dif, geo_dif = make_series_list(dif, dataset_json_path)
+            m = folium.Map(
+                location=return_location(dataset_json_content),
+                tiles=get_background_url(background_id),
+                zoom_start=12, attr='default'
+            )
+            colormap, gradient_map = get_colormap_gradient(geo_pre['features'], 'traffic_speed')
+            HeatMapWithTime(list_hm_tru, name='truth', min_opacity=1,
+                            radius=25, gradient=gradient_map).add_to(m)
+            HeatMapWithTime(list_hm_pre, name='prediction', min_opacity=1,
+                            radius=25, gradient=gradient_map).add_to(m)
+            HeatMapWithTime(list_hm_dif, name='difference', min_opacity=1,
+                            radius=25, gradient=gradient_map).add_to(m)
+            colormap.add_to(m)
+            for feature in geo_pre['features']:
+                make_map_only(feature, [], m, 'traffic_speed')
+            # folium.GeoJson(data=geo_pre, name='prediction').add_to(m)
+            folium.LayerControl(sortLayers=True).add_to(m)
+            logger.info("The task result file was generated successfully, html path: " + map_save_path)
+            m.save(map_save_path)
     except Exception:
+        dif = prediction-truth
         name_list = return_data_names(dataset_dir)
         prediction_mean = (prediction.mean(axis=0)).mean(axis=0)
         truth_mean = (truth.mean(axis=0)).mean(axis=0)
@@ -181,6 +209,26 @@ def form_line_statis(value_dict, asix_x, map_save_path, namelist):
                 orient="vertical",
                 pos_left="90%",
             )).render(map_save_path)
+    elif len(namelist) == 1 and len(value_dict) == 2:
+        Line(init_opts=opts.InitOpts(width="1200px", height="800px")).add_xaxis(xaxis_data=asix_x). \
+            add_yaxis(series_name="mean of predict " + str(namelist[0]), y_axis=value_dict[0],
+                      markline_opts=opts.MarkLineOpts(
+                          data=[opts.MarkLineItem(type_="average", name="平均值")]), ). \
+            add_yaxis(series_name="mean of truth " + str(namelist[0]), y_axis=value_dict[1],
+                      markline_opts=opts.MarkLineOpts(
+                          data=[opts.MarkLineItem(type_="average", name="平均值")]), ). \
+            set_global_opts(
+            title_opts=opts.TitleOpts(title=str("mean of " + namelist[0]),
+                                      pos_left='80%', ),
+            legend_opts=opts.LegendOpts(orient = 'vertical',pos_left = '40%',),
+            xaxis_opts=opts.AxisOpts(name='geo_id'),
+            yaxis_opts=opts.AxisOpts(name='value of ' + str(namelist[0]),
+                                     splitline_opts=opts.SplitLineOpts(is_show=True)),
+            toolbox_opts=opts.ToolboxOpts(
+                is_show=True,
+                orient="vertical",
+                pos_left="90%",
+            )).render(map_save_path)
     elif len(namelist) == 2 and len(value_dict) == 6:
         print(123)
         Line(init_opts=opts.InitOpts(width="1200px", height="800px")).add_xaxis(xaxis_data=asix_x). \
@@ -214,6 +262,7 @@ def return_data_names(file_path):
     """
     给出数据集的预测内容名称
     """
+    print(file_path)
     path = file_path.replace('_geo_json', '')
     for files in os.listdir(path):
         if files.count('dyna') > 0:
@@ -234,7 +283,7 @@ def return_data_names(file_path):
             else:
                 logger.error('show_data_statis dyna 未找到可绘制的属性：{}', data)
                 return ['value']
-        if files.count('grid') > 0:
+        if files.count('grid') > 0 and files.count('gridod') == 0:
             data = pd.read_csv(path + '/' + files, index_col='dyna_id')
             # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
             if 'risk' in data:
@@ -252,7 +301,10 @@ def return_data_names(file_path):
             else:
                 logger.error('show_data_statis grid 未找到可绘制的属性：{}', data)
                 return ['value']
-
+        if files.count('od') > 0:
+                return ['flow']
+        if files.count('gridod') > 0:
+                return ['flow']
 
 def make_series_list(result, dataset_json_path):
     # result [B,T,N,F] T个时间，N个位置，F个特征
@@ -332,7 +384,7 @@ def render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, 
     truth = file_data['truth']
     dif = prediction - truth
     try:
-        assert len(return_location(dataset_json_content)) < 0
+        assert len(return_location(dataset_json_content)) > 0
         m = folium.Map(
             location=return_location(dataset_json_content),
             tiles=get_background_url(background_id),
@@ -354,13 +406,13 @@ def render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, 
         grid_pic_value_dif = []
         for i in range(len(pre)):
             for j in range(len(pre[0])):
-                grid_pic_value_pre.append([int(i), int(j), round(float(pre[i][j]),2)])
+                grid_pic_value_pre.append([int(i), int(j), round(float(pre[i][j]), 2)])
         for i in range(len(tru)):
             for j in range(len(tru[0])):
-                grid_pic_value_tru.append([int(i), int(j), round(float(tru[i][j]),2)])
+                grid_pic_value_tru.append([int(i), int(j), round(float(tru[i][j]), 2)])
         for i in range(len(dif)):
             for j in range(len(dif[0])):
-                grid_pic_value_dif.append([int(i), int(j), round(float(dif[i][j]),2)])
+                grid_pic_value_dif.append([int(i), int(j), round(float(dif[i][j]), 2)])
         grid_pic_value = [grid_pic_value_pre, grid_pic_value_tru, grid_pic_value_dif]
         form_grid_statis_html(grid_pic_value, name_list, map_save_path)
 
@@ -452,6 +504,11 @@ def make_cor(data, m, dataset_json_content, dataset_dir, name):
 # map_save_path = 'D:/PycharmProjects/Bigscity-LibCity-master/test_result_statis1.html'
 # dataset_dir = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/HZMETRO_geo_json'
 #
+# dataset_json_path = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYCTAXI202004-202006_OD_geo_json/NYCTAXI202004-202006_od.json'
+# result_json_path = 'D:/PycharmProjects/Bigscity-LibCity-master/libcity/cache/2021_12_03_12_06_45_GEML_NYCTAXI202004-202006_OD_predictions.npz'
+# background_id = 1
+# map_save_path = 'D:/PycharmProjects/Bigscity-LibCity-master/test_result_statis4.html'
+# dataset_dir = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYCTAXI202004-202006_OD_geo_json'
 # render_to_map(dataset_json_path, result_json_path, background_id, map_save_path, dataset_dir)
 
 # dataset_grid_json_path = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYCTAXI201401-201403_GRID_geo_json/NYCTAXI201401-201403_grid.json'
@@ -466,4 +523,9 @@ def make_cor(data, m, dataset_json_content, dataset_dir, name):
 # map_save_path = 'D:/PycharmProjects/Bigscity-LibCity-master/test_result_statis3.html'
 # dataset_dir = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYCBike20140409_geo_json'
 
+# dataset_grid_json_path = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYC_TOD_geo_json/NYC_TOD_gridod.json'
+# result_json_path = 'D:/PycharmProjects/Bigscity-LibCity-master/libcity/cache/2021_11_22_16_41_52_GEML_NYC_TOD_predictions.npz'
+# background_id = 1
+# map_save_path = 'D:/PycharmProjects/Bigscity-LibCity-master/test_result_statis5.html'
+# dataset_dir = 'D:/PycharmProjects/Bigscity-LibCity-master/raw_data/NYC_TOD_geo_json'
 # render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path, dataset_dir)
