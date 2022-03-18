@@ -220,8 +220,11 @@ def return_location(geo_json):
                     location = block['geometry']['coordinates'][0][0]
                 else:
                     location = block['geometry']['coordinates'][0][0][0]
-    location.reverse()
-    return location
+    # reverse方法会影响原来json数据的坐标顺序
+    # location.reverse()
+    res_location = location[::-1]
+    logger.info('地图location: {}', location)
+    return res_location
 
 
 def red_style(feature):

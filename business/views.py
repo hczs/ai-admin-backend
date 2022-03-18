@@ -48,12 +48,18 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
     filter_class = FileFilter
 
     def get_serializer_class(self):
+        """
+        根据查询的动作返回响应的序列化类
+        """
         if self.action == 'list':
             return FileListSerializer
         else:
             return FileSerializer
 
     def create(self, request, *args, **kwargs):
+        """
+        新建数据集
+        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # 有些zip当中存在其他类型文件（如.grid），需要核实
@@ -122,11 +128,19 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
 
     @action(methods=['get'], detail=True)
     def generate_geo_json(self, *args, **kwargs):
+        """
+        传入dataset id, 生成 geojson 数据
+        """
         dataset = self.get_object()
         ExecuteGeojsonThread(dataset.extract_path, dataset.file_name).start()
         return Response(status=status.HTTP_200_OK)
 
     def perform_destroy(self, instance):
+        """
+        执行删除数据集方法
+
+        :param instance: 数据集文件对象实例
+        """
         # 删除记录前先检查是否有实验正在使用此数据集，如果有就提示不能删除
         dataset = self.get_object()
         tasks = Task.objects.filter(dataset=dataset.file_name)
@@ -145,6 +159,9 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         return True
 
     def destroy(self, request, *args, **kwargs):
+        """
+        删除数据集接口
+        """
         instance = self.get_object()
         result = self.perform_destroy(instance)
         if result:
@@ -161,6 +178,9 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
 
     @action(methods=['get'], detail=False, pagination_class=None)
     def get_all(self, request, *args, **kwargs):
+        """
+        查询所有数据集，不分页
+        """
         return self.list(self, request, *args, **kwargs)
 
     @action(methods=['get'], detail=True)
@@ -217,17 +237,26 @@ class TaskViewSet(ModelViewSet):
     filter_class = TaskFilter
 
     def get_serializer_class(self):
+        """
+        根据不同的请求操作使用不同的序列化类处理
+        """
         if self.action == 'list':
             return TaskListSerializer
         else:
             return TaskSerializer
 
     def list(self, request, *args, **kwargs):
+        """
+        查询优化
+        """
         self.queryset = TaskListSerializer.setup_eager_loading(self.queryset)
         return super(TaskViewSet, self).list(self, request, *args, **kwargs)
 
     @action(methods=['get'], detail=True)
     def test(self, *args, **kwargs):
+        """
+        测试接口，用于测试结果文件生成
+        """
         generate_result_map(self.get_object())
         return Response(status=status.HTTP_200_OK)
 
@@ -247,7 +276,8 @@ class TaskViewSet(ModelViewSet):
                 # remove掉这一条记录
                 settings.COMPLETED.remove(task_key)
                 res_data = {
-                    "task_name": task_name
+                    "task_name": task_name,
+                    "task_status": task.task_status
                 }
                 return Response(status=status.HTTP_200_OK, data=res_data)
         logger.info('实验暂未完成：{}', task_name)
@@ -277,9 +307,6 @@ class TaskViewSet(ModelViewSet):
     def get_config(self, *args, **kwargs):
         """
         获取指定任务的配置文件信息
-        :param args:
-        :param kwargs:
-        :return:
         """
         task = self.get_object()
         config_content = read_file_str(task.config_file)
@@ -293,6 +320,7 @@ class TaskViewSet(ModelViewSet):
         """
         task = self.get_object()
         log_file = task.log_file_name
+        logger.info('日志文件地址：{}', log_file)
         if log_file is not None and os.path.isfile(log_file):
             return generate_download_file(log_file)
         else:
@@ -412,6 +440,9 @@ class TaskViewSet(ModelViewSet):
     @renderer_classes((PassthroughRenderer,))
     @action(methods=['get'], detail=True)
     def download_task_model(self, request, *args, **kwargs):
+        """
+        下载任务模型
+        """
         # 找到模型位置路径在exp_id / model_cache / *.m
         # 模型名称 model_dataset.m
         task = self.get_object()
@@ -490,10 +521,8 @@ class TrafficStateEtaViewSet(ModelViewSet):
     def other_contrast_line(self, request, *args, **kwargs):
         """
         轨迹下一跳，到达时间估计，路网匹配 折线图数据返回
+
         :param request: task: 需要对比的任务的id的字符串，不同任务id之间以逗号分隔，如：1,2,3 taskType: 任务类型
-        :param args:
-        :param kwargs:
-        :return:
         """
         task_ids = request.query_params.get('task')
         task_type = request.query_params.get('taskType')
@@ -578,9 +607,8 @@ class TrafficStateEtaViewSet(ModelViewSet):
     def contrast_line(self, request, *args, **kwargs):
         """
         交通状态预测，折线图数据
+
         :param request: task: 需要对比的任务的id的字符串，不同任务id之间以逗号分隔，如：1,2,3
-        :param args:
-        :param kwargs:
         :return: 是每个指标的折线图数据的list
         """
         task_ids = request.query_params.get('task')
@@ -673,10 +701,13 @@ class TrafficStateEtaViewSet(ModelViewSet):
         # 根据id找到对应指标文件
         # 数据准备
         file_dir = settings.EVALUATE_PATH_PREFIX + str(task.exp_id) + settings.EVALUATE_PATH_SUFFIX
+        logger.info('指标文件夹路径：{}', file_dir)
         if os.path.isdir(file_dir):
             # 扫描文件夹下所有文件
             file_list = os.listdir(file_dir)
             for file in file_list:
+                logger.info('os.path.splitext(file)[0]: {} and evaluate_name: {}',
+                            os.path.splitext(file)[0], evaluate_name)
                 if os.path.splitext(file)[0] == evaluate_name:
                     file_path = file_dir + file
                     return generate_download_file(file_path)

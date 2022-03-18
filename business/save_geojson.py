@@ -579,7 +579,7 @@ def form_grid_statis_html(grid_pic_value, name, file):
 class VisHelper:
     def __init__(self, dataset, save_path):
         try:
-            self.raw_path = 'D:\\PycharmProjects\\Bigscity-LibCity-master'+ os.sep + 'raw_data\\'# settings.DATASET_PATH
+            self.raw_path = settings.DATASET_PATH
             print(self.raw_path)
             self.dataset = dataset
             print(self.dataset)
@@ -863,7 +863,7 @@ class VisHelper:
                   ensure_ascii=False, indent=4)
 
     def _visualize_geo(self):
-        geo_file = pd.read_csv(self.geo_path, index_col=None, nrows=2)
+        geo_file = pd.read_csv(self.geo_path, index_col=None)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         extra_feature = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
         for _, row in geo_file.iterrows():
