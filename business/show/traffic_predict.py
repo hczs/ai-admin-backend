@@ -82,15 +82,15 @@ def render_to_map(dataset_json_path, result_json_path, background_id, map_save_p
             name_list = return_data_names(dataset_dir)
             pre = ((prediction.mean(axis=0)).mean(axis=0)).mean(axis=1).reshape(-1)
             tru = ((truth.mean(axis=0)).mean(axis=0)).mean(axis=1).reshape(-1)
-            # dif = ((dif.mean(axis=0)).mean(axis=0)).mean(axis=1).reshape(-1)
-            value1_list_pre, value1_list_truth= [], []
+            dif = pre-tru
+            value1_list_pre, value1_list_truth, value1_list_dif = [], [], []
             for item in pre:
-                value1_list_pre.append(int(item))
+                value1_list_pre.append(float(item))
             for item in tru:
-                value1_list_truth.append(int(item))
-            # for item in dif:
-            #     value1_list_dif.append(int(item))
-            value_dict = [value1_list_pre, value1_list_truth]
+                value1_list_truth.append(float(item))
+            for item in dif:
+                value1_list_dif.append(float(item))
+            value_dict = [value1_list_pre, value1_list_truth,value1_list_dif]
             try:
                 asix_x = []
                 for i in range(len(pre)):
@@ -187,7 +187,7 @@ def form_line_statis(value_dict, asix_x, map_save_path, namelist):
     根据统计数据形成一个固定宽度的html页面
     """
     if len(namelist) == 1 and len(value_dict) == 3:
-        Line(init_opts=opts.InitOpts(width="1200px", height="800px")).add_xaxis(xaxis_data=asix_x). \
+        Line(init_opts=opts.InitOpts(width="1600px", height="700px")).add_xaxis(xaxis_data=asix_x). \
             add_yaxis(series_name="mean of predict " + str(namelist[0]), y_axis=value_dict[0],
                       markline_opts=opts.MarkLineOpts(
                           data=[opts.MarkLineItem(type_="average", name="平均值")]), ). \
@@ -201,7 +201,7 @@ def form_line_statis(value_dict, asix_x, map_save_path, namelist):
             title_opts=opts.TitleOpts(title=str("mean of " + namelist[0]), subtitle="Keep 1 decimal place (0.1)",
                                       pos_left='80%', ),
             legend_opts=opts.LegendOpts(orient = 'vertical',pos_left = '40%',),
-            xaxis_opts=opts.AxisOpts(name='geo_id'),
+            xaxis_opts=opts.AxisOpts(name='geo_id', is_show=True),
             yaxis_opts=opts.AxisOpts(name='value of ' + str(namelist[0]),
                                      splitline_opts=opts.SplitLineOpts(is_show=True)),
             toolbox_opts=opts.ToolboxOpts(
@@ -247,7 +247,7 @@ def form_line_statis(value_dict, asix_x, map_save_path, namelist):
             set_global_opts(
             title_opts=opts.TitleOpts(title=str("mean of " + str(namelist[0]) + ' & ' + str(namelist[1])),
                                       subtitle="Keep 1 decimal place (0.1)", pos_left='80%', ),
-            xaxis_opts=opts.AxisOpts(name='geo_id'),
+            xaxis_opts=opts.AxisOpts(name='geo_id', is_show=True,),
             yaxis_opts=opts.AxisOpts(name=str(namelist[0]) + ' & ' + str(namelist[1]) + ' value',
                                      splitline_opts=opts.SplitLineOpts(is_show=True)),
             legend_opts=opts.LegendOpts(orient='vertical', pos_left='40%', ),
@@ -302,9 +302,10 @@ def return_data_names(file_path):
                 logger.error('show_data_statis grid 未找到可绘制的属性：{}', data)
                 return ['value']
         if files.count('od') > 0:
-                return ['flow']
+                return ['outflow']
         if files.count('gridod') > 0:
-                return ['flow']
+                return ['outflow']
+
 
 def make_series_list(result, dataset_json_path):
     # result [B,T,N,F] T个时间，N个位置，F个特征
