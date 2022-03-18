@@ -168,7 +168,8 @@ def get_json_head(data, loc=""):
             feature_list.append(loc[1:])
         return
     if data_type == "dict":  # 如果是字典
-        data_dict = eval(data)
+        data_dict = eval(data)  # 耗时
+        # 循环 + 递归 耗时
         for key in data_dict:
             get_json_head(data_dict[key], loc + "_" + key)
         return
