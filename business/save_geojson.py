@@ -43,6 +43,15 @@ def transfer_geo_json(url, file, background_id):
 
 
 def make_map_only(_, heat, marker_cluster, tag, mean_or_not=True):
+    """
+    针对只有一个变量需要展示的数据集进行展示
+    :param
+    _: geojson文件当中的一个feature块
+    heat：用来存储热力图列表
+    marker_cluster：用来添加cluster的cluster池
+    tag：用来展示的目标数据标签（不能改为json中没有的名字）
+    mean_or_not：是否要求tag均值
+    """
     location_str = return_location(_)
     loc1 = location_str[0]
     loc = location_str[1:]
@@ -77,6 +86,15 @@ def make_map_only(_, heat, marker_cluster, tag, mean_or_not=True):
 
 
 def make_map_double(_, heat, marker_cluster, tag1, tag2, mean_or_not=True):
+    """
+    针对有两个变量需要联合展示的数据集进行展示
+    :param
+    _: geojson文件当中的一个feature块
+    heat：用来存储热力图列表
+    marker_cluster：用来添加cluster的cluster池
+    tag1，2：用来展示的目标数据标签（不能改为json中没有的名字）
+    mean_or_not：是否要求tag均值
+    """
     location_str = return_location(_)
     loc1 = location_str[0]
     loc = location_str[1:]
@@ -131,6 +149,14 @@ def make_heat(heat):
 
 
 def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
+    """
+    生成分级图的预制csv
+    :param
+    view_json: 解析好的geojson文件
+    file：文件名称
+    url：保存的上级路径
+    tag1-2：用来展示的目标数据标签（不能改为json中没有的名字）
+    """
     csv_raw_data = []
     if tag2 is None:
         tag_name = tag1
@@ -156,6 +182,15 @@ def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
 
 
 def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth"):
+    """
+    生成分级图
+    :param
+    csv_url: csv文件地址
+    m：地图名称
+    state_geo：geojson文件地址
+    tag1-2：用来展示的目标数据标签（不能改为json中没有的名字）
+    name:显示在页面上的layer名称
+    """
     Choropleth_data = pd.read_csv(csv_url)
     if tag2 is None:
         logger.info('only one tag provided,will use this tag to search csv')
@@ -407,6 +442,9 @@ def make_statis_only(data, file, tag, name, grid=False, gridod=False):
 
 
 def make_statis_double(data, file, tag1, tag2, name, grid=False):
+    """
+    利用两个参数，获取统计图象
+    """
     if not grid:
         try:
             x_axis = []
@@ -577,6 +615,9 @@ def form_grid_statis_html(grid_pic_value, name, file):
 
 
 class VisHelper:
+    """
+    生成json处理类
+    """
     def __init__(self, dataset, save_path):
         try:
             self.raw_path = settings.DATASET_PATH
@@ -640,6 +681,9 @@ class VisHelper:
 
 
     def visualize(self):
+        """
+        根据conf文件中的数据集类型生成json
+        """
         try:
             if self.type == 'trajectory':
                 # geo
@@ -681,6 +725,9 @@ class VisHelper:
             return self.file_form_status
 
     def _visualize_state(self):
+        """
+        state-->json
+        """
         geo_file = pd.read_csv(self.geo_path, index_col=None, nrows=500)
         dyna_file = pd.read_csv(self.dyna_path, index_col=None)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
@@ -697,6 +744,9 @@ class VisHelper:
                   ensure_ascii=False, indent=4)
 
     def _visualize_state_normal(self, geo_file, dyna_file, geo_feature_lst, dyna_feature_lst, geojson_obj):
+        """
+        state（not timeseries）-->json
+        """
         for _, row in geo_file.iterrows():
             # get feature dictionary
             geo_id = row['geo_id']
@@ -723,16 +773,13 @@ class VisHelper:
         return geojson_obj
 
     def _visualize_state_time(self, geo_file, dyna_file, geo_feature_lst, dyna_feature_lst, geojson_obj):
-        count_geo = dyna_file.shape[0]
-        time_count = 0
-        print(dyna_file.isnull().sum())
-        length = geo_file.shape[0]
+        """
+        state（timeseries）-->json
+        """
         for _, row in geo_file.iterrows():
-
             # get feature dictionary
             geo_id = row['geo_id']
             feature_dct = row[geo_feature_lst].to_dict()
-            # print(feature_dct)
             dyna_i = dyna_file[dyna_file['entity_id'] == geo_id]
             listi = []
 
@@ -758,6 +805,9 @@ class VisHelper:
         return geojson_obj
 
     def _visualize_grid(self):
+        """
+        grid-->json
+        """
         geo_file = pd.read_csv(self.geo_path, index_col=None)
         grid_file = pd.read_csv(self.grid_path, index_col=None)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
@@ -793,6 +843,9 @@ class VisHelper:
 
 
     def _visualize_gridod(self):
+        """
+        gridod-->json
+        """
         print(self.geo_path, self.gridod_path)
         geo_file = pd.read_csv(self.geo_path, index_col=None,nrows =2)
         gridod_file = dd.read_csv(self.gridod_path)
@@ -830,6 +883,9 @@ class VisHelper:
 
 
     def _visualize_od(self):
+        """
+        od-->json
+        """
         geo_file = pd.read_csv(self.geo_path, index_col=None, nrows=3)
         od_file = dd.read_csv(self.od_path)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
@@ -863,6 +919,9 @@ class VisHelper:
                   ensure_ascii=False, indent=4)
 
     def _visualize_geo(self):
+        """
+        geo-->json
+        """
         geo_file = pd.read_csv(self.geo_path, index_col=None)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         extra_feature = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
@@ -883,6 +942,9 @@ class VisHelper:
                   ensure_ascii=False, indent=4)
 
     def _visualize_dyna(self):
+        """
+        dyna-->json
+        """
         dyna_file = pd.read_csv(self.dyna_path, index_col=None)
 
         dyna_feature_lst = [_ for _ in list(dyna_file.columns) if _ not in self.dyna_reserved_lst]
