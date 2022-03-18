@@ -25,7 +25,6 @@ def matching_result_map(dataset_file, task, background_id):
     :param dataset_file: 数据集文件对象 对应表 tb_file
     :param task_id: 任务expid
     :param background_id: 地图底图id
-    :return:
     """
     dataset_dir = dataset_file.extract_path
     result_template = Template("${task_id}_${model}_${dataset}_result.${suffix}")
@@ -72,6 +71,15 @@ def matching_result_map(dataset_file, task, background_id):
 
 
 def render_to_map(dataset_json_path, result_json_path, background_id, map_save_path, dataset_dir):
+    """
+    非网格型数据生成html
+
+    :param dataset_json_path: 数据集原本生成的geojson
+    :param result_json_path: 结果集json
+    :param background_id: 地图底图id
+    :param map_save_path:保存地址
+    :param dataset_dir:原始数据集解压地址
+    """
     dataset_json_content = json.load(open(dataset_json_path, 'r'))
     file_data = np.load(result_json_path)
     prediction = file_data['prediction']
@@ -230,7 +238,6 @@ def form_line_statis(value_dict, asix_x, map_save_path, namelist):
                 pos_left="90%",
             )).render(map_save_path)
     elif len(namelist) == 2 and len(value_dict) == 6:
-        print(123)
         Line(init_opts=opts.InitOpts(width="1200px", height="800px")).add_xaxis(xaxis_data=asix_x). \
             add_yaxis("mean of predict " + str(namelist[0]), value_dict[0], markline_opts=opts.MarkLineOpts(
             data=[opts.MarkLineItem(type_="average", name="平均值")]), ). \
@@ -308,6 +315,9 @@ def return_data_names(file_path):
 
 
 def make_series_list(result, dataset_json_path):
+    """
+    二维数据+原数据json地址生成供热力图使用的时间序列
+    """
     # result [B,T,N,F] T个时间，N个位置，F个特征
     if result.ndim == 4:
         result = result.reshape(len(result), len(result[0]), len(result[0][0]))
@@ -378,6 +388,15 @@ def generate_geojson(geo_list):
 
 
 def render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path, dataset_dir):
+    """
+    网格型数据生成html
+
+    :param dataset_grid_json_path: 数据集原本生成的geojson
+    :param result_json_path: 结果集json
+    :param background_id: 地图底图id
+    :param map_save_path:保存地址
+    :param dataset_dir:原始数据集解压地址
+    """
     dataset_json_content = json.load(open(dataset_grid_json_path, 'r'))
     print(dataset_grid_json_path)
     file_data = np.load(result_json_path)
@@ -455,6 +474,9 @@ def form_grid_statis_html(grid_pic_value, name_list, map_save_path):
 
 
 def make_cor(data, m, dataset_json_content, dataset_dir, name):
+    """
+    生成分级图
+    """
     data = data.reshape(len(data), -1, 2)
     data_mean = data.mean(axis=0)
     data_mean = data_mean.mean(axis=1)

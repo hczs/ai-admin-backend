@@ -159,6 +159,9 @@ class ExpChildThread(threading.Thread):
 class ExecuteGeojsonThread(threading.Thread):
     """
     生成geojson文件
+    参数：
+    extract_path    压缩包提取路径
+    thread_name     文件名称（不带提取路径）
     """
 
     def __init__(self, extract_path, thread_name):
@@ -185,7 +188,11 @@ class ExecuteGeojsonThread(threading.Thread):
 
 class ExecuteGeoViewThread(threading.Thread):
     """
-    生成
+    执行生成原子文件数据集可视化的线程
+    参数：
+    extract_path    压缩包提取路径
+    thread_name     文件名称（不带提取路径）
+    background_id   背景图id
     """
 
     def __init__(self, extract_path, thread_name, background_id):
