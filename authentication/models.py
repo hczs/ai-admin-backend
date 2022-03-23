@@ -56,6 +56,7 @@ class Account(AbstractBaseUser, BaseModel):
     """
     account_number = models.CharField('账号', max_length=20, unique=True)
     password = models.CharField('密码', max_length=128, null=True)
+    mail = models.CharField('邮箱', max_length=128, null=True, unique=True)
     # 账户角色多对多
     roles = models.ManyToManyField(Role, blank=True, verbose_name='角色', db_constraint=False)
 

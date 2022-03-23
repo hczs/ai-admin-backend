@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 import queue
+
 from datetime import timedelta
 from pathlib import Path
 
@@ -188,3 +189,11 @@ logger.info("base.py settings loading")
 
 # 全局日志队列，存放日志name，监控新增日志，从队列中取出set进入task对象
 LOG_QUEUE = queue.Queue()
+
+# 邮件发送相关
+# 邮件发送者邮箱地址
+SENDER_ADDRESS = ''
+# 邮箱授权码
+SENDER_AUTHORIZATION_CODE = ''
+# SMTP 服务器地址
+SMTP_SERVER_ADDRESS = 'smtp.163.com'

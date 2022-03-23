@@ -1,7 +1,12 @@
 """
 基于内存缓存
+使用 memory_cache 实例即可
 """
 import time
+
+from loguru import logger
+
+from business.scheduler import task_execute_days
 
 
 class Value:
@@ -18,7 +23,7 @@ class Value:
         self.expired = expired
 
     def __str__(self):
-        return f"${self.value} + '--' + ${self.put_time} + '--' + ${self.expired}"
+        return f"value: {self.value}  put_time: {self.put_time}  expired: {self.expired}"
 
 
 class MemoryCache:
@@ -34,9 +39,10 @@ class MemoryCache:
         :param v: 缓存值
         :param expired: 缓存失效时间，单位秒(s)
         """
-        # 获取当前时间戳 10 位 秒级
-        current_timestamp = int(time.time())
-        self.__cache[k] = Value(v, current_timestamp, expired)
+        current_timestamp = int(time.time())  # 获取当前时间戳 10 位 秒级
+        value = Value(v, current_timestamp, expired)
+        self.__cache[k] = value
+        logger.info("已放入缓存, key: {} {}", k, value)
 
     def check_key(self, k):
         """
@@ -52,15 +58,31 @@ class MemoryCache:
             return False
         differ = current_timestamp - value.put_time
         if differ > value.expired:
-            # 证明缓存失效了，删除键值对
-            del self.__cache[k]
+            del self.__cache[k]  # 证明缓存失效了，删除键值对
+            logger.info("缓存已经失效, key: {}", k)
             return False
         return True
 
     def get_value(self, k):
+        """
+        通过缓存key获取值
+
+        :param k: key
+        :return: value
+        """
         if self.check_key(k):
             return self.__cache[k].value
         return None
 
+    def clean_cache(self):
+        """
+        清理缓存
+        """
+        for k in self.__cache.keys():
+            self.check_key(k)
+        logger.info("系统已将最近缓存内容清理")
+
 
 memory_cache = MemoryCache()
+
+task_execute_days(memory_cache.clean_cache, 10)
