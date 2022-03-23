@@ -4,8 +4,15 @@ import math
 __all__ = ['pybyte']
 
 import os
+import smtplib
 import subprocess
+import time
+from concurrent.futures import ThreadPoolExecutor
+from email.mime.text import MIMEText
+from smtplib import SMTP_SSL
+from multiprocessing import cpu_count
 
+from django.conf import settings
 from django.http import FileResponse
 import random
 from loguru import logger
@@ -63,7 +70,7 @@ def pybyte(size, dot=2):
 
 def execute_cmd(cmd):
     """
-    执行命令行命令
+    执行命令行命令（已弃用，请使用 ExecuteCmd 类）
 
     :param cmd: 命令内容
     :return: (status, output) status: 1 失败，0 成功
@@ -80,9 +87,43 @@ def execute_cmd(cmd):
     return status, output
 
 
+class ExecuteCmd:
+    def __init__(self, cmd):
+        self.terminate = False
+        self.cmd = cmd
+
+    def execute(self):
+        p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        # 判断命令是否执行成功
+        while True:
+            status = p.poll()
+            if status is not None:
+                logger.info("实验已结束，状态码：{}", status)
+                if self.terminate:
+                    output = '主动结束实验'
+                    errs = '主动结束实验'
+                else:
+                    output, errs = p.communicate()
+                if status == 0:
+                    logger.info('[SUCCESS] {}', self.cmd)
+                    return status, output
+                elif status == 1:
+                    logger.error('[ERROR] command: {}; message: {}', self.cmd, errs)
+                    return status, errs
+                else:
+                    logger.error('未知错误，状态码：{}', status)
+                    return status, 'Unknown Error'
+            else:
+                if self.terminate:
+                    p.terminate()
+                    logger.info("用户主动结束实验进程，命令内容：{}", self.cmd)
+            time.sleep(10)
+
+
 def read_file_str(file_path):
     """
     将一个文件内容读取到字符串中，仅适用于小文件读取，编码格式：utf-8
+
     :param file_path: 文件具体路径
     :return: 文件内容字符串
     """
@@ -110,20 +151,27 @@ def generate_download_file(file_path):
     return response_file
 
 
-def get_code():
+def get_code(pure_number=False):
     """
     随机生成六位字符串
+    :param pure_number: 是否需要纯数字
     """
     code = ''
-    for _ in range(6):
-        add = random.choice([random.randrange(10), chr(random.randrange(65, 91)), chr(random.randrange(97, 123))])
-        code += str(add)
+    if pure_number:
+        for _ in range(6):
+            add = random.choice([random.randrange(10)])
+            code += str(add)
+    else:
+        for _ in range(6):
+            add = random.choice([random.randrange(10), chr(random.randrange(65, 91)), chr(random.randrange(97, 123))])
+            code += str(add)
     return code
 
 
 def parentheses_escape(raw_string):
     """
     对字符串中的圆括号 '(' ')' 进行转义替换，替换为：'\\(' '\\)'
+
     :param raw_string: 原始字符串
     :return: 转义后字符串
     """
@@ -133,6 +181,7 @@ def parentheses_escape(raw_string):
 def str_is_empty(raw_string):
     """
     判断字符串是否为空
+
     :param raw_string: 字符串
     :return: 是否为空
     """
@@ -148,36 +197,56 @@ def query_type(data):
     return "value"
 
 
-feature_list = []  # 这里要保证有序，可以用有序字典，映射的时候可以用dict
+def get_geojson_properties(geojson):
+    """
+    获取geojson的所有properties的信息
 
+    :param geojson: geojson json对象
+    :return: properties dict
+    """
+    features = geojson.get('features', None)
+    if features is not None and type(features) is list and len(features) > 0:
+        properties = features[0].get('properties', None)
+        if properties is not None:
+            return properties
+        else:
+            logger.error('get_geojson_properties 没有 properties 属性')
+            return None
+    else:
+        logger.error('get_geojson_properties features 为空')
+        return None
+    # return geojson['features'][0]['properties']
 
-def get_json_features(json_path):
-    del feature_list[:]
-    # 这里要保证有序，可以用有序字典，映射的时候可以用dict
-    with open(json_path, 'r', encoding='UTF-8') as file_in:
-        data_str = file_in.read()
-    get_json_head(data_str)
-    return feature_list
-
-
-def get_json_head(data, loc=""):
-    data = str(data)  # 将数据转换成字符串
-    data_type = query_type(data)
-    if data_type == "value":  # 如果是元素
-        if loc[1:] not in feature_list:
-            feature_list.append(loc[1:])
-        return
-    if data_type == "dict":  # 如果是字典
-        data_dict = eval(data)  # 耗时
-        # 循环 + 递归 耗时
-        for key in data_dict:
-            get_json_head(data_dict[key], loc + "_" + key)
-        return
-    if data_type == "list":  # 如果是列表
-        data_list = list(eval(data))
-        for item in data_list:
-            get_json_head(item, loc)
-        return
+# feature_list = []  # 这里要保证有序，可以用有序字典，映射的时候可以用dict
+#
+#
+# def get_json_features(json_path):
+#     del feature_list[:]
+#     # 这里要保证有序，可以用有序字典，映射的时候可以用dict
+#     with open(json_path, 'r', encoding='UTF-8') as file_in:
+#         data_str = file_in.read()
+#     get_json_head(data_str)
+#     return feature_list
+#
+#
+# def get_json_head(data, loc=""):
+#     data = str(data)  # 将数据转换成字符串
+#     data_type = query_type(data)
+#     if data_type == "value":  # 如果是元素
+#         if loc[1:] not in feature_list:
+#             feature_list.append(loc[1:])
+#         return
+#     if data_type == "dict":  # 如果是字典
+#         data_dict = eval(data)  # 耗时
+#         # 循环 + 递归 耗时
+#         for key in data_dict:
+#             get_json_head(data_dict[key], loc + "_" + key)
+#         return
+#     if data_type == "list":  # 如果是列表
+#         data_list = list(eval(data))
+#         for item in data_list:
+#             get_json_head(item, loc)
+#         return
 
 
 def get_background_url(background_id):
@@ -249,3 +318,38 @@ def random_style(feature):
             'fillColor': color,
             'color': color
             }
+
+
+def send_mail(subject, message, to_address):
+    """
+    发送邮件
+
+    :param subject: 邮件主题描述
+    :param message: 邮件内容
+    :param to_address: 收件人
+    """
+    # 填写真实的发邮件服务器用户名、密码
+    user = settings.SENDER_ADDRESS
+    password = settings.SENDER_AUTHORIZATION_CODE
+    # 邮件内容
+    msg = MIMEText(message, 'plain', _charset="utf-8")
+    # 邮件主题描述
+    msg["Subject"] = subject
+    try:
+        with SMTP_SSL(host=settings.SMTP_SERVER_ADDRESS) as smtp:
+            # 登录发邮件服务器
+            smtp.login(user=user, password=password)
+            # 实际发送、接收邮件配置
+            smtp.sendmail(from_addr=user, to_addrs=to_address.split(','), msg=msg.as_string())
+            logger.info("邮件发送成功！目标邮箱：{}", to_address)
+    except smtplib.SMTPException as ex:
+        logger.error("发送邮件异常，目标邮箱：{}  异常信息：{}", to_address, ex)
+
+
+# ------------------------------
+#           全局变量区
+# ------------------------------
+# 全局线程池 线程数默认为 cpu 核心数 *
+thread_pool = ThreadPoolExecutor(max_workers=cpu_count() * 2)
+# 全局实验执行字典，key: 实验id value: ExecuteCmd 对象
+exp_cmd_map = {}

@@ -2,7 +2,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from business.threads import ExecuteCommandThread
 
-
 scheduler = BackgroundScheduler(timezone='Asia/Shanghai')
 scheduler.start()
 
@@ -22,6 +21,16 @@ def task_execute_at(task_name, str_command, run_date, task_id):
     :return:
     """
     scheduler.add_job(task_execute, 'date', run_date=run_date, args=[task_name, str_command], name=task_id)
+
+
+def task_execute_days(func, days):
+    """
+    定时任务 按天执行
+
+    :param func: 需要定时执行任务的函数
+    :param days: 多少天执行一次
+    """
+    scheduler.add_job(func, 'interval', days=days)
 
 
 def task_is_exists(task_id):

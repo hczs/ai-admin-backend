@@ -15,6 +15,8 @@ from authentication.permission import get_permission_list
 from authentication.serializers import AccountSerializer, RoleSerializer, PermissionSerializer, AccountSelectSerializer, \
     AccountListSerializer, PermissionCreateSerializer
 from authentication.utils import get_tree
+from common import utils
+from common.cache import memory_cache
 from common.utils import get_code
 
 
@@ -42,18 +44,59 @@ class AccountViewSet(ModelViewSet):
         else:
             return Response(data={'msg': '角色已存在！', 'id': accounts[0].id}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['post'], detail=False)
+    def send_code(self, request, *args, **kwargs):
+        """
+        发送验证码
+        """
+        mail = request.data.get('mail', None)
+        if mail:
+            # 邮箱重复性校验
+            accounts = Account.objects.filter(mail=mail).all()
+            if len(accounts) != 0:
+                return Response(status=status.HTTP_409_CONFLICT)
+            code = get_code(pure_number=True)
+            memory_cache.set_value(mail, code, 60 * 5)
+            subject = 'LibCity实验管理系统'
+            content = f'欢迎注册LibCity实验管理系统！您的验证码为：{code}  验证码五分钟有效，请不要告诉任何人！'
+            utils.thread_pool.submit(utils.send_mail, subject, content, mail)
+            return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
     def create(self, request, *args, **kwargs):
         """
         创建账户
         """
-        raw_password = get_code()
-        logger.debug('随机生成密码为：' + raw_password)
-        password = make_password(raw_password)
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(password=password)
-        data = {'raw_password': raw_password}
-        return Response(data)
+        password = request.data.get('password', None)
+        if password:
+            # 用户自行注册
+            mail = request.data.get('mail', None)
+            code = request.data.get('code', None)
+            logger.info('password: {}, mail: {}', password, mail)
+            # 邮箱校验
+            if not mail:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+            cache_code = memory_cache.get_value(mail)
+            if cache_code != code:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+            # 密码加密
+            password = make_password(password)
+            # 保存用户信息
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            # 设置默认角色 普通用户 注意：12号 id 角色是系统保护角色，角色名为普通用户
+            serializer.save(password=password, roles=[12])
+            return Response(status=status.HTTP_200_OK)
+        else:
+            # 管理员手动添加
+            raw_password = get_code()
+            logger.debug('随机生成密码为：' + raw_password)
+            password = make_password(raw_password)
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(password=password)
+            data = {'raw_password': raw_password}
+            return Response(data)
 
     def update(self, request, *args, **kwargs):
         password = None
@@ -72,6 +115,15 @@ class AccountViewSet(ModelViewSet):
             instance._prefetched_objects_cache = {}
 
         return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # 检查是否是系统保留账户，系统保留账户不可删除
+        protected_account_id = 3
+        if instance.id == protected_account_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(methods=['get'], detail=False, url_name='account_info', permission_classes=[IsAuthenticated],
             pagination_class=None)
@@ -145,6 +197,16 @@ class RoleViewSet(ModelViewSet):
             return Response(status=status.HTTP_200_OK)
         else:
             return Response(data={'msg': '角色已存在！', 'id': roles[0].id}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # 执行删除时检查是否是系统保留角色
+        protected_role_ids = [6, 12]
+        if instance.id in protected_role_ids:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        # 执行删除
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class PermissionViewSet(ModelViewSet):
