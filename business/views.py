@@ -8,15 +8,14 @@ import zipfile
 from string import Template
 
 from django.conf import settings
-from django.core import serializers
+from django.db.models import Q
 from django.http import FileResponse
-from django.shortcuts import render
 
 # Create your views here.
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from loguru import logger
-from rest_framework import status, renderers, mixins
+from rest_framework import status
 from rest_framework.decorators import action, renderer_classes
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin
 from rest_framework.parsers import MultiPartParser, JSONParser
@@ -25,20 +24,16 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from business.enums import TaskStatusEnum, DatasetStatusEnum, TaskEnum
 from business.filter import FileFilter, TaskFilter
-from business.models import File, Task, TrafficStatePredAndEta, MapMatching, TrajLocPred
+from business.models import TrafficStatePredAndEta, MapMatching, TrajLocPred
 from business.models import File, Task
-from business.save_geojson import get_geo_json
 from business.scheduler import task_execute_at, task_is_exists, remove_task
-from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer, \
-    TrafficStateEtaSerializer, MapMatchingSerializer, TrajLocPredSerializer
-from business.evaluate import evaluate_insert
+from business.serializers import TrafficStateEtaSerializer, MapMatchingSerializer, TrajLocPredSerializer
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
 from business.show.task_show import generate_result_map
-from business.threads import ExecuteCommandThread, ExecuteGeojsonThread, ExecuteGeoViewThread
+from business.threads import ExecuteGeojsonThread, ExecuteGeoViewThread
 from common.response import PassthroughRenderer
 from common.utils import read_file_str, generate_download_file, str_is_empty
 from bs4 import BeautifulSoup
-from business.show import map_matching_show
 
 
 class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin, GenericViewSet):
@@ -61,6 +56,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         新建数据集
         """
         serializer = self.get_serializer(data=request.data)
+        is_public = request.data.get('isPublic', None)   # 数据集是否公开
         serializer.is_valid(raise_exception=True)
         # 有些zip当中存在其他类型文件（如.grid），需要核实
         atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid', '.gridod', '.od']
@@ -76,6 +72,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
             file_name, ext = os.path.splitext(e)
             if (ext != "" or len(ext) != 0) and ext not in atomic_file_ext:
                 return Response(data={'detail': '数据包中文件格式不正确，请上传原子文件'}, status=status.HTTP_400_BAD_REQUEST)
+        self.is_public = is_public
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -111,8 +108,11 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                 if (ext != "" or len(ext) != 0) and tmp_name:
                     extract_without_folder(f, every, extract_path)
             zip_file.close()
-        serializer.save(file_name=file_name, file_path=file_path, file_size=file_size,
-                        extract_path=extract_path, dataset_status=DatasetStatusEnum.CHECK.value)
+        account = self.request.user  # 上传的时候添加创建者
+        is_public = 1 if self.is_public == 'true' else 0
+        serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, creator=account,
+                        extract_path=extract_path, dataset_status=DatasetStatusEnum.CHECK.value,
+                        visibility=is_public)
         logger.info('文件上传完毕，文件名: ' + file_name)
         # 生成geojson的json文件
         url = settings.ADMIN_FRONT_HTML_PATH + 'homepage.html'  # 网页地址
@@ -126,6 +126,34 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         # 启动执行任务线程，使用原子文件生成json
         ExecuteGeojsonThread(extract_path, file_name).start()
 
+    def list(self, request, *args, **kwargs):
+        """
+        默认查询本人上传的数据集 或 公开的数据集
+        """
+        params_dict = self.request.query_params
+        creator = params_dict.get('creator', None)
+        visibility = params_dict.get('visibility', None)
+        self.queryset = FileListSerializer.setup_eager_loading(self.queryset)
+        # 默认行为：查询自己的上传的数据集 和 所有公开数据集
+        # 只要不传 creator 参数的，一律认为是查询自己上传你的数据集 和 所有公开数据集
+        if creator is None or creator == '':
+            # 还有一种情况是只想查看公开的数据集
+            if visibility is not None and visibility == '1':
+                self.queryset = self.queryset.filter(visibility=1)
+            else:
+                self.queryset = self.queryset.filter(Q(creator=self.request.user) | Q(visibility=1))
+        else:
+            # 如果 creator 参数不为自己本人，默认添加 visibility = 1查询条件，因为想查别人的只能查公开数据集
+            if int(creator) != self.request.user.id:
+                self.queryset = self.queryset.filter(creator_id=creator, visibility=1)
+            elif visibility is None or visibility == '' or visibility == '2':
+                # 这里可以保证 creator 有值，且是本人
+                self.queryset = self.queryset.filter(creator_id=creator)
+            else:
+                # 这里可以保证 creator 有值，且是本人 且 想要查询自己带可视条件的值
+                self.queryset = self.queryset.filter(creator_id=creator, visibility=visibility)
+        return super(FileViewSet, self).list(self, request, *args, **kwargs)
+
     @action(methods=['get'], detail=True)
     def generate_geo_json(self, *args, **kwargs):
         """
@@ -133,6 +161,17 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         dataset = self.get_object()
         ExecuteGeojsonThread(dataset.extract_path, dataset.file_name).start()
+        return Response(status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=True)
+    def update_visibility(self, request, *args, **kwargs):
+        """
+        根据 id 更新数据集权限状态 visibility
+        """
+        dataset = self.get_object()
+        visibility = self.request.query_params['visibility']
+        dataset.visibility = visibility
+        dataset.save()
         return Response(status=status.HTTP_200_OK)
 
     def perform_destroy(self, instance):
@@ -215,11 +254,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         dataset = self.get_object()
         cur_file_name = dataset.file_name
-        logger.info('进行中的可视化任务: {}', settings.IN_PROGRESS)
-        logger.info('已完成的可视化任务: {}', settings.COMPLETED)
         for file_name in settings.COMPLETED:
             if file_name == cur_file_name:
-                logger.info('可视化完成：{}', file_name)
                 # remove掉这一条记录
                 settings.COMPLETED.remove(file_name)
                 logger.info('after remove COMPLETED: {}', settings.COMPLETED)
@@ -227,7 +263,6 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                     "file_name": file_name
                 }
                 return Response(status=status.HTTP_200_OK, data=res_data)
-        logger.info('文件暂未可视化完成: {}', cur_file_name)
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
@@ -268,11 +303,8 @@ class TaskViewSet(ModelViewSet):
         task = self.get_object()
         task_name = task.task_name
         cur_task_key = task.task_name + str(task.id)
-        logger.info('进行中的实验: {}', settings.IN_PROGRESS)
-        logger.info('已完成的实验: {}', settings.COMPLETED)
         for task_key in settings.COMPLETED:
             if task_key == cur_task_key:
-                logger.info('实验执行完毕：' + task_name)
                 # remove掉这一条记录
                 settings.COMPLETED.remove(task_key)
                 res_data = {
@@ -280,7 +312,6 @@ class TaskViewSet(ModelViewSet):
                     "task_status": task.task_status
                 }
                 return Response(status=status.HTTP_200_OK, data=res_data)
-        logger.info('实验暂未完成：{}', task_name)
         return Response(status=status.HTTP_202_ACCEPTED)
 
     @action(methods=['get'], detail=True)

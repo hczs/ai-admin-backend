@@ -11,10 +11,17 @@ class FileSerializer(serializers.ModelSerializer):
 
 
 class FileListSerializer(serializers.ModelSerializer):
+    creator = serializers.StringRelatedField()
 
     class Meta:
         model = File
         fields = '__all__'
+
+    @staticmethod
+    def setup_eager_loading(queryset):
+        """ Perform necessary eager loading of data. """
+        queryset = queryset.prefetch_related('creator')
+        return queryset
 
     def to_representation(self, instance):
         data = super(FileListSerializer, self).to_representation(instance)
