@@ -31,6 +31,7 @@ from business.serializers import TrafficStateEtaSerializer, MapMatchingSerialize
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
 from business.show.task_show import generate_result_map
 from business.threads import ExecuteGeojsonThread, ExecuteGeoViewThread
+from common import utils
 from common.response import PassthroughRenderer
 from common.utils import read_file_str, generate_download_file, str_is_empty
 from bs4 import BeautifulSoup
@@ -435,6 +436,19 @@ class TaskViewSet(ModelViewSet):
         if task.task_status == TaskStatusEnum.ERROR.value:
             task.execute_end_time = None
         task.save()
+        return Response(status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=True)
+    def interrupt_exp(self, request, *args, **kwargs):
+        """
+        根据实验ID（task.id）中断实验
+        """
+        task = self.get_object()
+        execute_cmd_obj = utils.exp_cmd_map.get(task.id, None)
+        if execute_cmd_obj is None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        # 中断实验
+        execute_cmd_obj.terminate = True
         return Response(status=status.HTTP_200_OK)
 
     @swagger_auto_schema(methods=['post'], request_body=openapi.Schema(
