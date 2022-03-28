@@ -1,3 +1,4 @@
+import time
 from copy import copy
 from string import Template
 from pyecharts import options as opts
@@ -11,7 +12,7 @@ import os
 from django.conf import settings
 from folium.plugins import HeatMap
 from business.enums import DatasetStatusEnum
-from common.utils import get_json_features, random_style
+from common.utils import random_style, get_background_url, get_geojson_properties
 from loguru import logger
 from sklearn import preprocessing
 import numpy as np
@@ -229,25 +230,9 @@ def show_geo_view(url, json_file, file, background_id):
     origin_location = return_location(_)
     if origin_location is not None:
         logger.info('尝试绘制' + geo_layer + '文件的地理图象')
-        if int(background_id) == 1:
-            background_url = 'https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
-        elif int(background_id) == 2:
-            background_url = 'https://mt.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'
-        elif int(background_id) == 3:
-            background_url = 'https://webrd02.is.autonavi.com/appmaptile?lang=zh_en&size=1&scale=1&style=8&x={' \
-                             'x}&y={y}&z={z} '
-        elif int(background_id) == 4:
-            background_url = 'http://webst02.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
-        elif int(background_id) == 5:
-            background_url = 'OpenStreetMap'
-        elif int(background_id) == 6:
-            background_url = 'https://tileserver.memomaps.de/tilegen/{z}/{x}/{y}.png'
-        elif int(background_id) == 7:
-            background_url = 'https://stamen-tiles-{s}.a.ssl.fastly.net/toner-hybrid/{z}/{x}/{y}{r}.png'
-        else:
-            background_url = 'https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
+        background_url = get_background_url(background_id)
         try:
-            feature_list = get_json_features(geo_layer)
+            feature_list = get_geojson_properties(view_json)
             # logger.info('json文件的可标记属性' + feature_list)
             loc1 = origin_location[0]
             loc = origin_location[1:]
@@ -928,20 +913,9 @@ class VisHelper:
         """
         geo_file = pd.read_csv(self.geo_path, index_col=None)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
-        # 耗时 。。 geo_file.columns 提前看看这个取值效率 时间较长
-        columns = geo_file.columns
         logger.info('加载的 geo 文件信息')
         geo_file.info(memory_usage='deep')
-        extra_feature = [_ for _ in list(columns) if _ not in self.geo_reserved_lst]
-        # for _, row in geo_file.iterrows():
-        #     feature_dct = row[extra_feature].to_dict()
-        #     feature_i = dict()
-        #     feature_i['type'] = 'Feature'
-        #     feature_i['properties'] = feature_dct
-        #     feature_i['geometry'] = {}
-        #     feature_i['geometry']['type'] = row['type']
-        #     feature_i['geometry']['coordinates'] = eval(row['coordinates'])
-        #     geojson_obj['features'].append(feature_i)
+        extra_feature = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
         # 按行遍历 性能优化
         for row in geo_file.itertuples():
             feature_dct = {}
@@ -957,6 +931,7 @@ class VisHelper:
 
         ensure_dir(self.save_path)
         save_name = "_".join(self.geo_path.split('/')[-1].split('.')) + '.json'
+        # 写入磁盘，比较耗时
         json.dump(geojson_obj, open(self.save_path + '/' + save_name, 'w',
                                     encoding='utf-8'),
                   ensure_ascii=False, indent=4)

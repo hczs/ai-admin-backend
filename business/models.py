@@ -12,10 +12,13 @@ class File(BaseModel):
     file_size = models.BigIntegerField(null=True)
     file_path = models.CharField(max_length=200, null=True)
     extract_path = models.CharField(max_length=200, null=True)
+    creator = models.ForeignKey(Account, null=True, default=None, db_constraint=False, on_delete=models.SET_NULL)
     # 地图底图id
     background_id = models.IntegerField(default=1)
     # 数据集状态 0 处理中 1 处理完成
     dataset_status = models.IntegerField(default=0)
+    # 私有/公开 0 私有 1 公开
+    visibility = models.IntegerField(default=1)
 
     class Meta:
         verbose_name = '文件'

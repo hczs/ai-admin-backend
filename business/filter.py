@@ -1,6 +1,7 @@
 import django_filters
 from django_filters.rest_framework import FilterSet
 
+from authentication.models import Account
 from business.models import File, Task, TrafficStatePredAndEta
 
 
@@ -13,6 +14,10 @@ class FileFilter(FilterSet):
     end = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='lte')
     # 文件名模糊查询
     file_name = django_filters.CharFilter(field_name='file_name', lookup_expr='icontains')
+    # 创建者精确查询
+    # creator = django_filters.ModelChoiceFilter(queryset=Account.objects.all())
+    # 私有 或 公开查询
+    # visibility = django_filters.NumberFilter(field_name='visibility')
 
     class Meta:
         model = File

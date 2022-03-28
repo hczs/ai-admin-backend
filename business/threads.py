@@ -11,7 +11,8 @@ from business.enums import TaskStatusEnum, DatasetStatusEnum, TaskEnum
 from business.evaluate import evaluate_insert
 from business.models import Task, File
 from business.show.task_show import generate_result_map
-from common.utils import execute_cmd, parentheses_escape
+from common import utils
+from common.utils import parentheses_escape, ExecuteCmd
 from business.save_geojson import transfer_geo_json, get_geo_json
 
 
@@ -23,7 +24,6 @@ class ExecuteCommandThread(threading.Thread):
     def __init__(self, thread_name, str_command):
         self.str_command = str_command
         super(ExecuteCommandThread, self).__init__(name=thread_name)
-
 
     def set_log_file(self, task):
         # 从队列中取出放入数据库
@@ -62,6 +62,7 @@ class ExpChildThread(threading.Thread):
     """
     具体执行命令的线程
     """
+
     def __init__(self, thread_name, str_command, backup_dir, task):
         self.str_command = str_command
         self.backup_dir = backup_dir
@@ -125,14 +126,17 @@ class ExpChildThread(threading.Thread):
             for file in file_list:
                 if os.path.splitext(file)[1] == '.csv':
                     new_name = result_template.safe_substitute(task_id=task.id, model=task.model,
-                                                                 dataset=task.dataset, suffix='csv')
+                                                               dataset=task.dataset, suffix='csv')
                     os.rename(file_dir + file, file_dir + new_name)
                     break
 
     def run(self) -> None:
         task = self.task
         task_key = task.task_name + str(task.id)
-        status, output = execute_cmd(self.str_command)
+        execute_obj = ExecuteCmd(self.str_command)
+        # 放入全局字典中，随时可取出执行对象中断实验
+        utils.exp_cmd_map[task.id] = execute_obj
+        status, output = execute_obj.execute()
         if status == 0:
             # 更新为已完成状态
             task.task_status = TaskStatusEnum.COMPLETED.value

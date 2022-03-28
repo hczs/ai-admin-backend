@@ -44,6 +44,14 @@ class AccountViewSet(ModelViewSet):
         else:
             return Response(data={'msg': '角色已存在！', 'id': accounts[0].id}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['get'], detail=False)
+    def list_all(self, request, *args, **kwargs):
+        """
+        查询所有账户，只返回账号和id两列
+        """
+        account_list = Account.objects.values("id", "account_number")
+        return Response(account_list)
+
     @action(methods=['post'], detail=False)
     def send_code(self, request, *args, **kwargs):
         """
