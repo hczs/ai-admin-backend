@@ -215,10 +215,9 @@ class ExecuteGeoViewThread(threading.Thread):
         file_view_status = DatasetStatusEnum.PROCESSING.value
         try:
             if os.listdir(self.extract_path + '_geo_json') is not None:
-                print(1234)
                 file_view_status = transfer_geo_json(self.extract_path + '_geo_json', self.file_name,
                                                      self.background_id)
-                print(file_view_status)
+                logger.info("文件可视化完毕，文件状态：{}", file_view_status)
         except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
             logger.error('ExecuteGeoViewThread transfer_geo_json 异常：{}', ex)

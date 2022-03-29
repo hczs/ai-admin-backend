@@ -83,6 +83,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
     def perform_create(self, serializer):
         """
         数据集文件上传处理
+
+        :return: 是否处理成功
         """
         start = time.time()
         my_file = self.request.FILES.get('dataset', None)
@@ -554,7 +556,6 @@ class TaskViewSet(ModelViewSet):
         根据任务id获取结果
         """
         task = self.get_object()
-        print(task)
         # 变更任务状态
         if task.task_status != 2:
             return Response(data={'detail': '任务尚未输出结果'}, status=status.HTTP_400_BAD_REQUEST)
