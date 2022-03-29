@@ -121,12 +121,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                         extract_path=extract_path, dataset_status=DatasetStatusEnum.CHECK.value,
                         visibility=is_public)
         logger.info('文件上传完毕，文件名: ' + file_name)
-        # 生成geojson的json文件
-        url = settings.ADMIN_FRONT_HTML_PATH + 'homepage.html'  # 网页地址
-        soup = BeautifulSoup(open(url, encoding='utf-8'), features='html.parser')
-        content = str.encode(soup.prettify())  # 获取页面内容
+        # 创建一个空的html文件，后续可视化直接写入
         fp = open(settings.ADMIN_FRONT_HTML_PATH + file_name + ".html", "w+b")  # 打开一个文本文件
-        fp.write(content)  # 写入数据
         fp.close()  # 关闭文件
         end = time.time()
         logger.info('上传文件初步处理运行时间: {} s；下面进行geojson文件的生成', end - start)

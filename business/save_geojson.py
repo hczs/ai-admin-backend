@@ -7,7 +7,7 @@ import dask.dataframe as dd
 import branca
 import folium
 import pandas as pd
-import json
+import ujson as json
 import os
 from django.conf import settings
 from folium.plugins import HeatMap
@@ -968,7 +968,7 @@ class VisHelper:
                             feature_i['geometry']['coordinates'].append(coor)
                         i += 1
                     except Exception as ex:
-                        logger.info('dyna_file 无法找到位置信息，异常信息：{}', ex)
+                        logger.error('dyna_file 无法找到位置信息，异常信息：{}', ex)
                 else:
                     break
                 if len(feature_i['geometry']['coordinates']) > 0:
