@@ -151,7 +151,10 @@ class ExpChildThread(threading.Thread):
             task.task_status = TaskStatusEnum.ERROR.value
         task.execute_end_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())  # 任务结束时间
         # 更新执行信息
-        task.execute_msg = str(output, "utf-8")
+        if type(output) == str:
+            task.execute_msg = str(output)
+        else:
+            task.execute_msg = str(output, "utf-8")
         task.save()
         # 返回原工作目录
         os.chdir(self.backup_dir)

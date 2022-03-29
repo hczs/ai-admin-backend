@@ -37,6 +37,8 @@ class Task(BaseModel):
     execute_end_time = models.DateTimeField(null=True)
     task_status = models.IntegerField(default=0)
     execute_msg = models.TextField(null=True)
+    # 私有/公开 0 私有 1 公开
+    visibility = models.IntegerField(default=1)
     # 以下是任务执行参数
     task = models.CharField(max_length=30)
     model = models.CharField(max_length=30)

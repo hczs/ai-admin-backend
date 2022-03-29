@@ -31,6 +31,7 @@ from business.serializers import TrafficStateEtaSerializer, MapMatchingSerialize
 from business.serializers import FileSerializer, TaskSerializer, TaskListSerializer, FileListSerializer
 from business.show.task_show import generate_result_map
 from business.threads import ExecuteGeojsonThread, ExecuteGeoViewThread
+from common import utils
 from common.response import PassthroughRenderer
 from common.utils import read_file_str, generate_download_file, str_is_empty
 from bs4 import BeautifulSoup
@@ -215,6 +216,15 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         return generate_download_file(settings.DATASET_EXAMPLE_PATH)
 
+    @renderer_classes((PassthroughRenderer,))
+    @action(methods=['get'], detail=True)
+    def download_by_id(self, request, *args, **kwargs):
+        """
+        根据数据集id下载数据集文件
+        """
+        dataset = self.get_object()
+        return generate_download_file(dataset.file_path)
+
     @action(methods=['get'], detail=False, pagination_class=None)
     def get_all(self, request, *args, **kwargs):
         """
@@ -282,9 +292,30 @@ class TaskViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """
-        查询优化
+        任务列表查询
         """
+        params_dict = self.request.query_params
+        creator = params_dict.get('creator', None)
+        visibility = params_dict.get('visibility', None)
         self.queryset = TaskListSerializer.setup_eager_loading(self.queryset)
+        # 默认行为：查询自己的上传的数据集 和 所有公开数据集
+        # 只要不传 creator 参数的，一律认为是查询自己上传你的数据集 和 所有公开数据集
+        if creator is None or creator == '':
+            # 还有一种情况是只想查看公开的数据集
+            if visibility is not None and visibility == '1':
+                self.queryset = self.queryset.filter(visibility=1)
+            else:
+                self.queryset = self.queryset.filter(Q(creator=self.request.user) | Q(visibility=1))
+        else:
+            # 如果 creator 参数不为自己本人，默认添加 visibility = 1查询条件，因为想查别人的只能查公开数据集
+            if int(creator) != self.request.user.id:
+                self.queryset = self.queryset.filter(creator_id=creator, visibility=1)
+            elif visibility is None or visibility == '' or visibility == '2':
+                # 这里可以保证 creator 有值，且是本人
+                self.queryset = self.queryset.filter(creator_id=creator)
+            else:
+                # 这里可以保证 creator 有值，且是本人 且 想要查询自己带可视条件的值
+                self.queryset = self.queryset.filter(creator_id=creator, visibility=visibility)
         return super(TaskViewSet, self).list(self, request, *args, **kwargs)
 
     @action(methods=['get'], detail=True)
@@ -293,6 +324,17 @@ class TaskViewSet(ModelViewSet):
         测试接口，用于测试结果文件生成
         """
         generate_result_map(self.get_object())
+        return Response(status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=True)
+    def update_visibility(self, request, *args, **kwargs):
+        """
+        根据 id 更新数据集权限状态 visibility
+        """
+        task = self.get_object()
+        visibility = self.request.query_params['visibility']
+        task.visibility = visibility
+        task.save()
         return Response(status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=True)
@@ -403,6 +445,19 @@ class TaskViewSet(ModelViewSet):
         if task.task_status == TaskStatusEnum.ERROR.value:
             task.execute_end_time = None
         task.save()
+        return Response(status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=True)
+    def interrupt_exp(self, request, *args, **kwargs):
+        """
+        根据实验ID（task.id）中断实验
+        """
+        task = self.get_object()
+        execute_cmd_obj = utils.exp_cmd_map.get(task.id, None)
+        if execute_cmd_obj is None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        # 中断实验
+        execute_cmd_obj.terminate = True
         return Response(status=status.HTTP_200_OK)
 
     @swagger_auto_schema(methods=['post'], request_body=openapi.Schema(

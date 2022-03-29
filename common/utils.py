@@ -336,7 +336,7 @@ def send_mail(subject, message, to_address):
     # 邮件主题描述
     msg["Subject"] = subject
     try:
-        with SMTP_SSL(host=settings.SMTP_SERVER_ADDRESS) as smtp:
+        with SMTP_SSL(host=settings.SMTP_SERVER_ADDRESS, port=settings.SMTP_SERVER_PORT) as smtp:
             # 登录发邮件服务器
             smtp.login(user=user, password=password)
             # 实际发送、接收邮件配置
@@ -349,7 +349,7 @@ def send_mail(subject, message, to_address):
 # ------------------------------
 #           全局变量区
 # ------------------------------
-# 全局线程池 线程数默认为 cpu 核心数 *
+# 全局线程池 线程数默认为 cpu 核心数 * 2
 thread_pool = ThreadPoolExecutor(max_workers=cpu_count() * 2)
 # 全局实验执行字典，key: 实验id value: ExecuteCmd 对象
 exp_cmd_map = {}
