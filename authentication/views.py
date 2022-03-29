@@ -71,6 +71,24 @@ class AccountViewSet(ModelViewSet):
             return Response(status=status.HTTP_200_OK)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['post'], detail=True)
+    def bind_mail(self, request, *args, **kwargs):
+        """
+        绑定邮箱
+        """
+        account = self.get_object()
+        mail = request.data.get('mail', None)
+        code = request.data.get('code', None)
+        # 确定验证码是否有效
+        if not mail:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        cache_code = memory_cache.get_value(mail)
+        if cache_code != code:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        account.mail = mail
+        account.save()
+        return Response(status=status.HTTP_200_OK)
+
     def create(self, request, *args, **kwargs):
         """
         创建账户
@@ -80,7 +98,6 @@ class AccountViewSet(ModelViewSet):
             # 用户自行注册
             mail = request.data.get('mail', None)
             code = request.data.get('code', None)
-            logger.info('password: {}, mail: {}', password, mail)
             # 邮箱校验
             if not mail:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
