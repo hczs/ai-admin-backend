@@ -57,7 +57,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         新建数据集
         """
         serializer = self.get_serializer(data=request.data)
-        is_public = request.data.get('isPublic', None)   # 数据集是否公开
+        is_public = request.data.get('isPublic', None)  # 数据集是否公开
         serializer.is_valid(raise_exception=True)
         # 有些zip当中存在其他类型文件（如.grid），需要核实
         atomic_file_ext = ['.geo', '.usr', '.rel', '.dyna', '.ext', '.json', '.grid', '.gridod', '.od']
@@ -74,7 +74,9 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
             if (ext != "" or len(ext) != 0) and ext not in atomic_file_ext:
                 return Response(data={'detail': '数据包中文件格式不正确，请上传原子文件'}, status=status.HTTP_400_BAD_REQUEST)
         self.is_public = is_public
-        self.perform_create(serializer)
+        enable = self.perform_create(serializer)
+        if not enable:
+            return Response(status=status.HTTP_409_CONFLICT)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
@@ -91,7 +93,9 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
             os.makedirs(path)
         file_size = my_file.size
         original_file_name, ext = os.path.splitext(my_file.name)
-        file_path = file_duplication_handle(original_file_name, ext, path, 1)  # zip文件路径
+        enable, file_path = dataset_duplication_handle(original_file_name, ext, path)  # zip文件路径
+        if not enable:
+            return False
         path, file_name_and_ext = os.path.split(file_path)
         file_name, ext = os.path.splitext(file_name_and_ext)
         extract_path = os.path.join(path, file_name)  # 解压目录，解压到zip文件名下的文件夹目录
@@ -126,6 +130,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         logger.info('上传文件初步处理运行时间: {} s；下面进行geojson文件的生成', end - start)
         # 启动执行任务线程，使用原子文件生成json
         ExecuteGeojsonThread(extract_path, file_name).start()
+        return True
 
     def list(self, request, *args, **kwargs):
         """
@@ -783,7 +788,7 @@ class TrafficStateEtaViewSet(ModelViewSet):
         task = Task.objects.get(id=task_id)
         evaluate_template = Template("${task_id}_${model}_${dataset}")
         evaluate_name = evaluate_template.safe_substitute(task_id=task.id, model=task.model,
-                                                                 dataset=task.dataset)
+                                                          dataset=task.dataset)
         # 根据id找到对应指标文件
         # 数据准备
         file_dir = settings.EVALUATE_PATH_PREFIX + str(task.exp_id) + settings.EVALUATE_PATH_SUFFIX
@@ -832,6 +837,23 @@ def file_duplication_handle(original_file_name, ext, path, index):
             return file_path
     else:
         return file_path
+
+
+def dataset_duplication_handle(original_file_name, ext, path):
+    """
+    数据集文件名重复处理策略
+
+    :param original_file_name: 原始文件名
+    :param ext: 文件后缀
+    :param path: raw path 路径
+    :return: 返回是否可用（boolean）和文件路径
+    """
+    file_path = path + original_file_name + ext
+    if os.path.isfile(file_path):
+        logger.info("文件重复，文件路径：{}", file_path)
+        return False, file_path
+    else:
+        return True, file_path
 
 
 def extract_without_folder(arc_name, full_item_name, folder):
