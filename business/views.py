@@ -216,6 +216,15 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         return generate_download_file(settings.DATASET_EXAMPLE_PATH)
 
+    @renderer_classes((PassthroughRenderer,))
+    @action(methods=['get'], detail=True)
+    def download_by_id(self, request, *args, **kwargs):
+        """
+        根据数据集id下载数据集文件
+        """
+        dataset = self.get_object()
+        return generate_download_file(dataset.file_path)
+
     @action(methods=['get'], detail=False, pagination_class=None)
     def get_all(self, request, *args, **kwargs):
         """

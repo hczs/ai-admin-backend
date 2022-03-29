@@ -13,24 +13,23 @@ class AccountSerializer(serializers.ModelSerializer):
 
 
 class AccountListSerializer(serializers.ModelSerializer):
-
+    """
+    查询结果返回序列化 列表查询
+    """
     roles = serializers.StringRelatedField(many=True)
 
-    """
-    查询结果返回序列化
-    """
     class Meta:
         model = Account
-        fields = ['id', 'account_number', 'roles', 'create_time', 'update_time']
+        fields = ['id', 'account_number', 'mail', 'roles', 'create_time', 'update_time']
 
 
 class AccountSelectSerializer(serializers.ModelSerializer):
     """
-    查询结果返回序列化
+    查询结果返回序列化 单个查询
     """
     class Meta:
         model = Account
-        fields = ['id', 'account_number', 'roles', 'create_time', 'update_time']
+        fields = ['id', 'account_number', 'mail', 'roles', 'create_time', 'update_time']
 
 
 class PermissionSerializer(serializers.ModelSerializer):
@@ -51,20 +50,6 @@ class PermissionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Permission
         fields = "__all__"
-
-# class RoleSerializer(serializers.ModelSerializer):
-#     """
-#     弃用
-#     """
-#
-#     permissions_tree = serializers.SerializerMethodField(label='权限树信息')
-#
-#     class Meta:
-#         model = Role
-#         fields = ['id', 'name', 'description', 'permissions', 'create_time', 'update_time', 'permissions_tree']
-#
-#     def get_permissions_tree(self, obj):
-#         return get_tree(obj.permissions.values())
 
 
 class RoleSerializer(serializers.ModelSerializer):
