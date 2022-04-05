@@ -7,7 +7,7 @@ import dask.dataframe as dd
 import branca
 import folium
 import pandas as pd
-import json
+import ujson as json
 import os
 from django.conf import settings
 from folium.plugins import HeatMap
@@ -23,6 +23,9 @@ def transfer_geo_json(url, file, background_id):
     通过文件路径获取geojson文件，根据文件的类型进行可视化
     """
     for json_file in os.listdir(url):
+        # 只接收json文件
+        if not json_file.endswith('.json'):
+            continue
         if json_file.count('dyna') > 0:
             if json_file.count('_truth_dyna') > 0:
                 pass
@@ -182,7 +185,7 @@ def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
     return csv_path
 
 
-def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth"):
+def add_choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth"):
     """
     生成分级图
     :param
@@ -192,32 +195,38 @@ def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth
     tag1-2：用来展示的目标数据标签（不能改为json中没有的名字）
     name:显示在页面上的layer名称
     """
-    Choropleth_data = pd.read_csv(csv_url)
+    choropleth_data = pd.read_csv(csv_url)
     if tag2 is None:
         logger.info('only one tag provided,will use this tag to search csv')
-        folium.Choropleth(
+        cp = folium.Choropleth(
             geo_data=state_geo,
             name=name,
-            data=Choropleth_data,
+            data=choropleth_data,
             columns=["geo_id", tag1],
             key_on="feature.id",
             fill_color="YlGn",
             fill_opacity=0.7,
             line_opacity=0.2,
-            legend_name="Unemployment Rate (%)",
+            legend_name=tag1,
+            highlight=True
         ).add_to(m)
+        # 添加分级图 tooltip 显示
+        folium.GeoJsonTooltip(fields=['geo_id', tag1],).add_to(cp.geojson)
     else:
-        folium.Choropleth(
+        cp = folium.Choropleth(
             geo_data=state_geo,
             name=name,
-            data=Choropleth_data,
+            data=choropleth_data,
             columns=["geo_id", 'total_' + tag1 + '_' + tag2],
             key_on="feature.id",
             fill_color="YlGn",
             fill_opacity=0.7,
             line_opacity=0.2,
             legend_name='total_' + tag1 + '_' + tag2,
+            highlight=True
         ).add_to(m)
+        # 添加分级图 tooltip 显示
+        folium.GeoJsonTooltip(fields=['geo_id', tag1, tag2],).add_to(cp.geojson)
 
 
 def show_geo_view(url, json_file, file, background_id):
@@ -232,8 +241,8 @@ def show_geo_view(url, json_file, file, background_id):
         logger.info('尝试绘制' + geo_layer + '文件的地理图象')
         background_url = get_background_url(background_id)
         try:
-            feature_list = get_geojson_properties(view_json)
-            # logger.info('json文件的可标记属性' + feature_list)
+            feature_properties_dict = get_geojson_properties(view_json)
+            feature_list = list(feature_properties_dict.keys())
             loc1 = origin_location[0]
             loc = origin_location[1:]
             loc.append(loc1)
@@ -247,13 +256,8 @@ def show_geo_view(url, json_file, file, background_id):
             # marker_cluster = MarkerCluster(name='Cluster').add_to(m)
             logger.info('background select:' + background_url)
             #   所有可能的展示组合
-            #   features_properties_traffic_speed
-            #   features_properties_inflow, features_properties_outflow
-            #   features_properties_length
-            #   features_properties_highway
-            #   features_properties_usr_id
-            #   (last property in list)
-            if 'features_properties_traffic_speed' in feature_list:
+            #   traffic_speed / inflow, outflow / length / highway / usr_id / (last property in list)
+            if 'traffic_speed' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, m, tag='traffic_speed')
                 heat_minmax = make_heat(heat)
@@ -261,38 +265,44 @@ def show_geo_view(url, json_file, file, background_id):
                 colormap, gradient_map = get_colormap_gradient(view_json['features'], 'traffic_speed')
                 colormap.add_to(m)
                 HeatMap(heat_minmax, name='traffic_speed_heatmap', gradient=gradient_map).add_to(m)
-            elif 'features_properties_inflow' and 'features_properties_outflow' in feature_list:
-                for _ in view_json['features']:
-                    if _['geometry']['type'] == 'MultiPolygon':
-                        pass
-                    else:
-                        make_map_double(_, heat, m, tag1='inflow', tag2='outflow')
-                heat_minmax = make_heat(heat)
+            elif 'inflow' and 'outflow' in feature_list:
+                # 分级图显示不加打点信息
+                # for _ in view_json['features']:
+                #     if _['geometry']['type'] == 'MultiPolygon':
+                #         pass
+                #     else:
+                #         make_map_double(_, heat, m, tag1='inflow', tag2='outflow')
+                # 有分级图就不加热力图了
+                # heat_minmax = make_heat(heat)
                 csv_url = make_Choropleth_csv(view_json, file, url, tag1='inflow', tag2='outflow')
                 try:
-                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow', tag2='outflow', name='Cor')
+                    add_choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow', tag2='outflow', name='Cor')
                 except Exception as ex:
                     logger.error('show_geo_view add_Choropleth 异常：{}', ex)
-                HeatMap(heat_minmax, name='total_flow_heatmap').add_to(m)
-                folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
-            elif 'features_properties_flow' in feature_list:
-                for _ in view_json['features']:
-                    if _['geometry']['type'] == 'MultiPolygon':
-                        pass
-                    else:
-                        make_map_only(_, heat, m, tag='flow')
+                # 有分级图就不加热力图了
+                # HeatMap(heat_minmax, name='total_flow_heatmap').add_to(m)
+                # 分级图就不加原来的geojson了，直接显示分级图
+                # folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
+            elif 'flow' in feature_list:
+                # 分级图显示不加打点信息
+                # for _ in view_json['features']:
+                #     if _['geometry']['type'] == 'MultiPolygon':
+                #         pass
+                #     else:
+                #         make_map_only(_, heat, m, tag='flow')
                 csv_url = make_Choropleth_csv(view_json, file, url, tag1='flow')
                 try:
-                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='flow', name='Choropleth of outflow')
+                    add_choropleth(csv_url, m, state_geo=geo_layer, tag1='flow', name='Choropleth of outflow')
                 except Exception as ex:
                     logger.error('show_geo_view add_Choropleth 异常：{}', ex)
-                folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
-            elif 'features_properties_length' in feature_list:
+                # 分级图就不加原来的geojson了，直接显示分级图
+                # folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
+            elif 'length' in feature_list:
                 # length 移除打点，打点的话 bj_edge_roadmap 会变得鬼畜
                 # for _ in view_json['features']:
                 #     make_map_only(_, heat, m, 'length', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
-            elif 'features_properties_traj_id' in feature_list:
+            elif 'traj_id' in feature_list:
                 # 轨迹数据
                 for _ in view_json['features']:
                     make_map_only(_, heat, m, 'traj_id', mean_or_not=False)
@@ -314,7 +324,7 @@ def show_geo_view(url, json_file, file, background_id):
                                tooltip=tooltip,
                                popup=popup,
                                style_function=random_style).add_to(m)
-            elif 'features_properties_usr_id' in feature_list:
+            elif 'usr_id' in feature_list:
                 # 用户轨迹不打点
                 # for _ in view_json['features']:
                 #     make_map_only(_, heat, m, 'usr_id', mean_or_not=False)
@@ -332,12 +342,12 @@ def show_geo_view(url, json_file, file, background_id):
                 folium.GeoJson(
                     geo_layer, name=f"{json_file}",
                     tooltip=usr_tooltip, popup=usr_popup, style_function=random_style).add_to(m)
-            elif 'features_properties_highway' in feature_list:
+            elif 'highway' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, m, 'highway', mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
             else:
-                property = str(feature_list[-1]).replace('features_properties_', '')
+                property = str(feature_list[-1])
                 for _ in view_json['features']:
                     make_map_only(_, heat, m, property, mean_or_not=False)
                 folium.GeoJson(geo_layer, name=f"{json_file}").add_to(m)
@@ -350,8 +360,8 @@ def show_geo_view(url, json_file, file, background_id):
             file_view_status = DatasetStatusEnum.SUCCESS.value
             logger.info(geo_layer + '文件的地理图象绘制成功')
         except Exception as ex:
-            file_view_status = show_data_statis(url, file)
             logger.error('show_geo_view异常：{}', ex)
+            file_view_status = show_data_statis(url, file)
     else:
         file_view_status = show_data_statis(url, file)
     return file_view_status
@@ -609,6 +619,7 @@ class VisHelper:
     """
     生成json处理类
     """
+
     def __init__(self, dataset, save_path):
         try:
             self.raw_path = settings.DATASET_PATH
@@ -754,7 +765,7 @@ class VisHelper:
             feature_i['geometry'] = {}
             coordinates = eval(row['coordinates'])
             # 判断坐标是否是只有一个点LineString
-            if len(coordinates) == 1 and type(coordinates[0]) == list:
+            if row['type'] == 'LineString' and len(coordinates) == 1 and type(coordinates[0]) == list:
                 feature_i['geometry']['type'] = 'Point'
                 feature_i['geometry']['coordinates'] = coordinates[0]
             else:
@@ -836,15 +847,15 @@ class VisHelper:
         """
         gridod-->json
         """
-        print(self.geo_path, self.gridod_path)
+        logger.info("gridod文件转geojson: self.geo_path: {} self.gridod_path: {}", self.geo_path, self.gridod_path)
         geo_file = pd.read_csv(self.geo_path, index_col=None, nrows=2)
         gridod_file = dd.read_csv(self.gridod_path)
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         # get feature_lst
         geo_feature_lst = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
-        print(geo_feature_lst)
+        logger.info("gridod文件转geojson: geo_feature_lst: {}", geo_feature_lst)
         gridod_feature_lst = [_ for _ in list(gridod_file.columns) if _ not in self.gridod_reserved_lst]
-        print(gridod_feature_lst)
+        logger.info("gridod文件转geojson: gridod_feature_lst: {}", gridod_feature_lst)
         for _, row in geo_file.iterrows():
             geo_id = row['geo_id']
             # get feature dictionary origin_row_id', 'origin_column_id
@@ -880,9 +891,9 @@ class VisHelper:
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         # get feature_lst
         geo_feature_lst = [_ for _ in list(geo_file.columns) if _ not in self.geo_reserved_lst]
-        print(geo_feature_lst)
+        logger.info("od文件转geojson: geo_feature_lst: {}", geo_feature_lst)
         od_feature_lst = [_ for _ in list(od_file.columns) if _ not in self.od_reserved_lst]
-        print(od_feature_lst)
+        logger.info("od文件转geojson: od_feature_lst: {}", od_feature_lst)
         for _, row in geo_file.iterrows():
             # get feature dictionary
             geo_id = row['geo_id']
@@ -968,7 +979,7 @@ class VisHelper:
                             feature_i['geometry']['coordinates'].append(coor)
                         i += 1
                     except Exception as ex:
-                        logger.info('dyna_file 无法找到位置信息，异常信息：{}', ex)
+                        logger.error('dyna_file 无法找到位置信息，异常信息：{}', ex)
                 else:
                     break
                 if len(feature_i['geometry']['coordinates']) > 0:

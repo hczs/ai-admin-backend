@@ -7,6 +7,7 @@ import os
 import smtplib
 import subprocess
 import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from email.mime.text import MIMEText
 from smtplib import SMTP_SSL
@@ -217,6 +218,7 @@ def get_geojson_properties(geojson):
         return None
     # return geojson['features'][0]['properties']
 
+
 # feature_list = []  # 这里要保证有序，可以用有序字典，映射的时候可以用dict
 #
 #
@@ -344,6 +346,22 @@ def send_mail(subject, message, to_address):
             logger.info("邮件发送成功！目标邮箱：{}", to_address)
     except smtplib.SMTPException as ex:
         logger.error("发送邮件异常，目标邮箱：{}  异常信息：{}", to_address, ex)
+
+
+def extract_without_folder(arc_name, full_item_name, folder):
+    """
+    解压压缩包中的指定文件到指定目录
+
+    :param arc_name: 压缩包文件
+    :param full_item_name: 压缩包中指定文件的全路径，相对压缩包的相对路径
+    :param folder: 解压的目标目录，绝对路径
+    """
+    with zipfile.ZipFile(arc_name) as zf:
+        file_data = zf.read(full_item_name)
+    # 中文乱码解决
+    full_item_name = full_item_name.encode('cp437').decode('gbk')
+    with open(os.path.join(folder, os.path.basename(full_item_name)), "wb") as file_out:
+        file_out.write(file_data)
 
 
 # ------------------------------

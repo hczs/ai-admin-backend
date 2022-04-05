@@ -37,7 +37,7 @@ def matching_result_map(dataset_file, task, background_id):
     for file in file_list:
         if file == result_file_name:
             result_json_path = result_dir + file
-    print(result_json_path)
+    logger.info("result_json_path: {}", result_json_path)
     # 准备dataset dyna json
     dataset_dir = dataset_dir + "_geo_json"
     dataset_json_path = None
@@ -103,13 +103,13 @@ def render_to_map(dataset_json_path, result_json_path, background_id, map_save_p
                 asix_x = []
                 for i in range(len(pre)):
                     asix_x.append(str(i))
-                print(value_dict[0], len(value_dict[0]))
-                print(name_list)
-                print(asix_x)
+                logger.info('value_dict[0]: {} len(value_dict[0]: {}',value_dict[0], len(value_dict[0]))
+                logger.info("name_list: {}", name_list)
+                logger.info("asix_x: {}", asix_x)
                 form_line_statis(value_dict, asix_x, map_save_path, name_list)
                 logger.info('结果统计图象html已经生成')
-            except Exception:
-                logger.info('结果统计图象html生成失败')
+            except Exception as ex:
+                logger.info('结果统计图象html生成失败，异常信息：{}', ex)
         else:
             dif = prediction - truth
             if len(prediction[0][0][0]) == 2:
@@ -181,13 +181,13 @@ def render_to_map(dataset_json_path, result_json_path, background_id, map_save_p
                     value1_list_dif.append(int(item_list[0]))
             value_dict = [value1_list_pre, value1_list_truth, value1_list_dif]
         try:
-            print(value_dict[0], len(value_dict[0]))
-            print(name_list)
-            print(asix_x)
+            logger.info('value_dict[0]: {} len(value_dict[0]: {}', value_dict[0], len(value_dict[0]))
+            logger.info("name_list: {}", name_list)
+            logger.info("asix_x: {}", asix_x)
             form_line_statis(value_dict, asix_x, map_save_path, name_list)
             logger.info('结果统计图象html已经生成')
-        except Exception:
-            logger.info('结果统计图象html生成失败')
+        except Exception as ex:
+            logger.info('结果统计图象html生成失败，异常信息：{}', ex)
 
 
 def form_line_statis(value_dict, asix_x, map_save_path, namelist):
@@ -269,7 +269,7 @@ def return_data_names(file_path):
     """
     给出数据集的预测内容名称
     """
-    print(file_path)
+    logger.info("file_path: {}", file_path)
     path = file_path.replace('_geo_json', '')
     for files in os.listdir(path):
         if files.count('dyna') > 0:
@@ -398,7 +398,7 @@ def render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, 
     :param dataset_dir:原始数据集解压地址
     """
     dataset_json_content = json.load(open(dataset_grid_json_path, 'r'))
-    print(dataset_grid_json_path)
+    logger.info("网格型数据生成html-dataset_grid_json_path: {}", dataset_grid_json_path)
     file_data = np.load(result_json_path)
     prediction = file_data['prediction']
     truth = file_data['truth']
@@ -497,7 +497,7 @@ def make_cor(data, m, dataset_json_content, dataset_dir, name):
     csv_url = dataset_dir + "/form_cor.csv"
     np.savetxt(csv_url, X=data_list, delimiter=',')
     name_list = return_data_names(dataset_dir)
-    print(name_list)
+    logger.info("生成分级图-name_list: {}", name_list)
     try:
         if len(name_list) == 1:
             df = pd.read_csv(csv_url, header=None, names=['geo_id', str(name_list[0])])
