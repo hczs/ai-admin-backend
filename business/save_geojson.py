@@ -23,6 +23,9 @@ def transfer_geo_json(url, file, background_id):
     通过文件路径获取geojson文件，根据文件的类型进行可视化
     """
     for json_file in os.listdir(url):
+        # 只接收json文件
+        if not json_file.endswith('.json'):
+            continue
         if json_file.count('dyna') > 0:
             if json_file.count('_truth_dyna') > 0:
                 pass
@@ -182,7 +185,7 @@ def make_Choropleth_csv(view_json, file, url, tag1=None, tag2=None):
     return csv_path
 
 
-def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth"):
+def add_choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth"):
     """
     生成分级图
     :param
@@ -192,32 +195,38 @@ def add_Choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth
     tag1-2：用来展示的目标数据标签（不能改为json中没有的名字）
     name:显示在页面上的layer名称
     """
-    Choropleth_data = pd.read_csv(csv_url)
+    choropleth_data = pd.read_csv(csv_url)
     if tag2 is None:
         logger.info('only one tag provided,will use this tag to search csv')
-        folium.Choropleth(
+        cp = folium.Choropleth(
             geo_data=state_geo,
             name=name,
-            data=Choropleth_data,
+            data=choropleth_data,
             columns=["geo_id", tag1],
             key_on="feature.id",
             fill_color="YlGn",
             fill_opacity=0.7,
             line_opacity=0.2,
-            legend_name="Unemployment Rate (%)",
+            legend_name=tag1,
+            highlight=True
         ).add_to(m)
+        # 添加分级图 tooltip 显示
+        folium.GeoJsonTooltip(fields=['geo_id', tag1],).add_to(cp.geojson)
     else:
-        folium.Choropleth(
+        cp = folium.Choropleth(
             geo_data=state_geo,
             name=name,
-            data=Choropleth_data,
+            data=choropleth_data,
             columns=["geo_id", 'total_' + tag1 + '_' + tag2],
             key_on="feature.id",
             fill_color="YlGn",
             fill_opacity=0.7,
             line_opacity=0.2,
             legend_name='total_' + tag1 + '_' + tag2,
+            highlight=True
         ).add_to(m)
+        # 添加分级图 tooltip 显示
+        folium.GeoJsonTooltip(fields=['geo_id', tag1, tag2],).add_to(cp.geojson)
 
 
 def show_geo_view(url, json_file, file, background_id):
@@ -247,12 +256,7 @@ def show_geo_view(url, json_file, file, background_id):
             # marker_cluster = MarkerCluster(name='Cluster').add_to(m)
             logger.info('background select:' + background_url)
             #   所有可能的展示组合
-            #   traffic_speed
-            #   inflow, outflow
-            #   length
-            #   highway
-            #   usr_id
-            #   (last property in list)
+            #   traffic_speed / inflow, outflow / length / highway / usr_id / (last property in list)
             if 'traffic_speed' in feature_list:
                 for _ in view_json['features']:
                     make_map_only(_, heat, m, tag='traffic_speed')
@@ -262,31 +266,37 @@ def show_geo_view(url, json_file, file, background_id):
                 colormap.add_to(m)
                 HeatMap(heat_minmax, name='traffic_speed_heatmap', gradient=gradient_map).add_to(m)
             elif 'inflow' and 'outflow' in feature_list:
-                for _ in view_json['features']:
-                    if _['geometry']['type'] == 'MultiPolygon':
-                        pass
-                    else:
-                        make_map_double(_, heat, m, tag1='inflow', tag2='outflow')
-                heat_minmax = make_heat(heat)
+                # 分级图显示不加打点信息
+                # for _ in view_json['features']:
+                #     if _['geometry']['type'] == 'MultiPolygon':
+                #         pass
+                #     else:
+                #         make_map_double(_, heat, m, tag1='inflow', tag2='outflow')
+                # 有分级图就不加热力图了
+                # heat_minmax = make_heat(heat)
                 csv_url = make_Choropleth_csv(view_json, file, url, tag1='inflow', tag2='outflow')
                 try:
-                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow', tag2='outflow', name='Cor')
+                    add_choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow', tag2='outflow', name='Cor')
                 except Exception as ex:
                     logger.error('show_geo_view add_Choropleth 异常：{}', ex)
-                HeatMap(heat_minmax, name='total_flow_heatmap').add_to(m)
-                folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
+                # 有分级图就不加热力图了
+                # HeatMap(heat_minmax, name='total_flow_heatmap').add_to(m)
+                # 分级图就不加原来的geojson了，直接显示分级图
+                # folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
             elif 'flow' in feature_list:
-                for _ in view_json['features']:
-                    if _['geometry']['type'] == 'MultiPolygon':
-                        pass
-                    else:
-                        make_map_only(_, heat, m, tag='flow')
+                # 分级图显示不加打点信息
+                # for _ in view_json['features']:
+                #     if _['geometry']['type'] == 'MultiPolygon':
+                #         pass
+                #     else:
+                #         make_map_only(_, heat, m, tag='flow')
                 csv_url = make_Choropleth_csv(view_json, file, url, tag1='flow')
                 try:
-                    add_Choropleth(csv_url, m, state_geo=geo_layer, tag1='flow', name='Choropleth of outflow')
+                    add_choropleth(csv_url, m, state_geo=geo_layer, tag1='flow', name='Choropleth of outflow')
                 except Exception as ex:
                     logger.error('show_geo_view add_Choropleth 异常：{}', ex)
-                folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
+                # 分级图就不加原来的geojson了，直接显示分级图
+                # folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
             elif 'length' in feature_list:
                 # length 移除打点，打点的话 bj_edge_roadmap 会变得鬼畜
                 # for _ in view_json['features']:
@@ -609,6 +619,7 @@ class VisHelper:
     """
     生成json处理类
     """
+
     def __init__(self, dataset, save_path):
         try:
             self.raw_path = settings.DATASET_PATH
@@ -754,7 +765,7 @@ class VisHelper:
             feature_i['geometry'] = {}
             coordinates = eval(row['coordinates'])
             # 判断坐标是否是只有一个点LineString
-            if len(coordinates) == 1 and type(coordinates[0]) == list:
+            if row['type'] == 'LineString' and len(coordinates) == 1 and type(coordinates[0]) == list:
                 feature_i['geometry']['type'] = 'Point'
                 feature_i['geometry']['coordinates'] = coordinates[0]
             else:

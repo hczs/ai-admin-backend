@@ -1,7 +1,9 @@
 import os
 import platform
+import shutil
 import threading
 import time
+import zipfile
 from string import Template
 
 from django.conf import settings
@@ -12,7 +14,7 @@ from business.evaluate import evaluate_insert
 from business.models import Task, File
 from business.show.task_show import generate_result_map
 from common import utils
-from common.utils import parentheses_escape, ExecuteCmd
+from common.utils import parentheses_escape, ExecuteCmd, extract_without_folder
 from business.save_geojson import transfer_geo_json, get_geo_json
 
 
@@ -171,22 +173,35 @@ class ExecuteGeojsonThread(threading.Thread):
     thread_name     文件名称（不带提取路径）
     """
 
-    def __init__(self, extract_path, thread_name):
+    def __init__(self, zip_path, extract_path, thread_name):
+        self.zip_path = zip_path
         self.file_name = thread_name
         self.extract_path = extract_path
         super(ExecuteGeojsonThread, self).__init__(name=thread_name)
 
     def run(self):
+        # 放到 IN_PROGRESS 之前先检查 settings.COMPLETED 中是否已经存在此 file_name 如果已经存在，就移除 COMPLETED 中的 file_name
+        if self.file_name in settings.COMPLETED:
+            settings.COMPLETED.remove(self.file_name)
         settings.IN_PROGRESS.append(self.file_name)
         file_view_status = DatasetStatusEnum.UN_PROCESS.value
         file_obj = File.objects.get(file_name=self.file_name)
+        # 解压缩文件
+        with open(self.zip_path, 'rb') as f:
+            zip_file = zipfile.ZipFile(f)
+            zip_list = zip_file.namelist()
+            for every in zip_list:
+                tmp_name, ext = os.path.splitext(every)
+                if (ext != "" or len(ext) != 0) and tmp_name:
+                    extract_without_folder(f, every, self.extract_path)
+            zip_file.close()
         file_form_status = get_geo_json(self.file_name, self.extract_path + '_geo_json')
         if file_form_status == DatasetStatusEnum.PROCESSING_COMPLETE.value:
-            logger.info(self.file_name + 'geojson文件生成完毕')
+            logger.info(self.file_name + ' geojson文件生成完毕')
             # 处理完毕，更新数据集状态
             file_obj.dataset_status = file_view_status
         else:
-            logger.error(self.file_name + '无法生成geojson文件')
+            logger.error(self.file_name + ' 无法生成geojson文件')
             file_obj.dataset_status = file_form_status
         file_obj.save()
         settings.IN_PROGRESS.remove(self.file_name)

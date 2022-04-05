@@ -8,6 +8,7 @@ import zipfile
 from string import Template
 
 from django.conf import settings
+from django.core.files.uploadedfile import TemporaryUploadedFile
 from django.db.models import Q
 from django.http import FileResponse
 
@@ -94,27 +95,29 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         if not os.path.isdir(path):
             os.makedirs(path)
         file_size = my_file.size
+        # 检验是否重复
         original_file_name, ext = os.path.splitext(my_file.name)
         enable, file_path = dataset_duplication_handle(original_file_name, ext, path)  # zip文件路径
         if not enable:
             return False
+        # 没有重复，就求出解压目录 extract_path 的值
         path, file_name_and_ext = os.path.split(file_path)
         file_name, ext = os.path.splitext(file_name_and_ext)
         extract_path = os.path.join(path, file_name)  # 解压目录，解压到zip文件名下的文件夹目录
+        zip_path = os.path.join(path, file_name_and_ext)  # zip文件路径
         # 创建解压目录
         if not os.path.isdir(extract_path):
             os.makedirs(extract_path)
-        with open(os.path.join(path, file_name_and_ext), 'wb+') as f:
-            for chunk in my_file.chunks():
-                f.write(chunk)
-            # 写入完毕解压缩文件
-            zip_file = zipfile.ZipFile(f)
-            zip_list = zip_file.namelist()
-            for every in zip_list:
-                tmp_name, ext = os.path.splitext(every)
-                if (ext != "" or len(ext) != 0) and tmp_name:
-                    extract_without_folder(f, every, extract_path)
-            zip_file.close()
+        # 大文件就直接把临时文件 copy 到 raw_data_path
+        if type(my_file) == TemporaryUploadedFile:
+            temporary_file_path = my_file.file.name
+            logger.info("存储到服务器上的临时文件路径：{} 正在把此文件复制到 raw_data 目录中：{}", temporary_file_path, zip_path)
+            shutil.copyfile(temporary_file_path, file_path)
+        else:
+            # 对于小文件，直接在这处理了
+            with open(os.path.join(path, file_name_and_ext), 'wb+') as f:
+                for chunk in my_file.chunks():
+                    f.write(chunk)
         account = self.request.user  # 上传的时候添加创建者
         is_public = 1 if self.is_public == 'true' else 0
         serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, creator=account,
@@ -127,7 +130,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         end = time.time()
         logger.info('上传文件初步处理运行时间: {} s；下面进行geojson文件的生成', end - start)
         # 启动执行任务线程，使用原子文件生成json
-        ExecuteGeojsonThread(extract_path, file_name).start()
+        ExecuteGeojsonThread(zip_path=zip_path, extract_path=extract_path, thread_name=file_name).start()
         return True
 
     def list(self, request, *args, **kwargs):
@@ -249,7 +252,6 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         根据任务id和背景图号生成geojson转化的gis图象或者使用原子文件生成描述性可视化
         """
-        # 生成geojson的json文件
         background_id = request.query_params.get('background')
         dataset = self.get_object()
         dataset.dataset_status = DatasetStatusEnum.PROCESSING.value
@@ -271,7 +273,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
             if file_name == cur_file_name:
                 # remove掉这一条记录
                 settings.COMPLETED.remove(file_name)
-                logger.info('after remove COMPLETED: {}', settings.COMPLETED)
+                logger.debug('after remove completed: {}', settings.COMPLETED)
                 res_data = {
                     "file_name": file_name
                 }
@@ -851,19 +853,3 @@ def dataset_duplication_handle(original_file_name, ext, path):
         return False, file_path
     else:
         return True, file_path
-
-
-def extract_without_folder(arc_name, full_item_name, folder):
-    """
-    解压压缩包中的指定文件到指定目录
-
-    :param arc_name: 压缩包文件
-    :param full_item_name: 压缩包中指定文件的全路径，相对压缩包的相对路径
-    :param folder: 解压的目标目录，绝对路径
-    """
-    with zipfile.ZipFile(arc_name) as zf:
-        file_data = zf.read(full_item_name)
-    # 中文乱码解决
-    full_item_name = full_item_name.encode('cp437').decode('gbk')
-    with open(os.path.join(folder, os.path.basename(full_item_name)), "wb") as file_out:
-        file_out.write(file_data)
