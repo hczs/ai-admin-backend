@@ -69,7 +69,7 @@ class AccountViewSet(ModelViewSet):
             content = f'欢迎注册LibCity实验管理系统！您的验证码为：{code}  验证码五分钟有效，请不要告诉任何人！'
             utils.thread_pool.submit(utils.send_mail, subject, content, mail)
             return Response(status=status.HTTP_200_OK)
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'detail': '邮箱不能为空'}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['post'], detail=True)
     def bind_mail(self, request, *args, **kwargs):
@@ -81,10 +81,11 @@ class AccountViewSet(ModelViewSet):
         code = request.data.get('code', None)
         # 确定验证码是否有效
         if not mail:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'detail': '邮箱不能为空'}, status=status.HTTP_400_BAD_REQUEST)
         cache_code = memory_cache.get_value(mail)
         if cache_code != code:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            logger.info('验证码错误，缓存中的验证码为：{}，输入的验证码为：{}'.format(cache_code, code))
+            return Response(data={'detail': '验证码不正确'}, status=status.HTTP_400_BAD_REQUEST)
         account.mail = mail
         account.save()
         return Response(status=status.HTTP_200_OK)
@@ -100,10 +101,11 @@ class AccountViewSet(ModelViewSet):
             code = request.data.get('code', None)
             # 邮箱校验
             if not mail:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'detail': '邮箱不能为空'}, status=status.HTTP_400_BAD_REQUEST)
             cache_code = memory_cache.get_value(mail)
             if cache_code != code:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                logger.info('验证码错误，缓存中的验证码为：{}，输入的验证码为：{}'.format(cache_code, code))
+                return Response(data={'detail': '验证码不正确'}, status=status.HTTP_400_BAD_REQUEST)
             # 密码加密
             password = make_password(password)
             # 保存用户信息
