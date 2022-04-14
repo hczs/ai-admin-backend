@@ -86,8 +86,8 @@ class ExpChildThread(threading.Thread):
         result_template = Template("${task_id}_${model}_${dataset}_result.${suffix}")
         evaluate_template = Template("${task_id}_${model}_${dataset}.${suffix}")
         # 不同任务类型，结果文件不一样
-        if task.task == TaskEnum.TRAFFIC_STATE_PRED.value or task.task == TaskEnum.ETA.value:
-            # 交通状态和到达时间估计是一类 指标文件csv和结果文件npz
+        if task.task == TaskEnum.TRAFFIC_STATE_PRED.value:
+            # 交通状态和 指标文件csv和结果文件npz
             for file in file_list:
                 if os.path.splitext(file)[1] == '.csv':
                     new_name = evaluate_template.safe_substitute(task_id=task.id, model=task.model,
@@ -100,10 +100,10 @@ class ExpChildThread(threading.Thread):
                                                                dataset=task.dataset, suffix='npz')
                     os.rename(file_dir + file, file_dir + new_name)
                     break
-        elif task.task == TaskEnum.MAP_MATCHING.value:
+        elif task.task == TaskEnum.MAP_MATCHING.value or task.task == TaskEnum.ETA.value:
             rename_csv = True
             rename_json = True
-            # 路网匹配 指标文件csv和 结果文件geo json
+            # 路网匹配到达时间估计是一类 指标文件csv和 结果文件geo json
             for file in file_list:
                 if rename_csv and os.path.splitext(file)[1] == '.csv':
                     new_name = evaluate_template.safe_substitute(task_id=task.id, model=task.model,
@@ -153,10 +153,13 @@ class ExpChildThread(threading.Thread):
             task.task_status = TaskStatusEnum.ERROR.value
         task.execute_end_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())  # 任务结束时间
         # 更新执行信息
-        if type(output) == str:
-            task.execute_msg = str(output)
-        else:
-            task.execute_msg = str(output, "utf-8")
+        try:
+            if type(output) == str:
+                task.execute_msg = str(output)
+            else:
+                task.execute_msg = str(output, "utf-8")
+        except Exception as e:
+            task.execute_msg = str(e)
         task.save()
         # 返回原工作目录
         os.chdir(self.backup_dir)

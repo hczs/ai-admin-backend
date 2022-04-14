@@ -94,7 +94,7 @@ class ExecuteCmd:
         self.cmd = cmd
 
     def execute(self):
-        p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
         # 判断命令是否执行成功
         while True:
             status = p.poll()
