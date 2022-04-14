@@ -16,10 +16,11 @@ class TaskStatusEnum(Enum):
     """
     任务状态枚举类
     """
-    NOT_STARTED = 0
-    IN_PROGRESS = 1
-    COMPLETED = 2
-    ERROR = -1
+    NOT_STARTED = 0  # 未开始
+    IN_PROGRESS = 1  # 进行中
+    COMPLETED = 2  # 已完成
+    SELECTED_EXECUTE_TIME = 3  # 已选择执行时间
+    ERROR = -1  # 出错
 
 
 class DatasetStatusEnum(Enum):

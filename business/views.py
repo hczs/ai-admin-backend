@@ -444,10 +444,12 @@ class TaskViewSet(ModelViewSet):
         # 更新任务执行时间信息
         if execute_time:
             task.execute_time = execute_time
+            task.task_status = TaskStatusEnum.SELECTED_EXECUTE_TIME.value
         else:
             task.execute_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
         # 如果是执行出错重新执行，需要把结束时间置空
-        if task.task_status == TaskStatusEnum.ERROR.value:
+        if task.task_status == TaskStatusEnum.ERROR.value or \
+                task.task_status == TaskStatusEnum.SELECTED_EXECUTE_TIME.value:
             task.execute_end_time = None
         task.save()
         return Response(status=status.HTTP_200_OK)
