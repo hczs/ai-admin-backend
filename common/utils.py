@@ -13,6 +13,7 @@ from email.mime.text import MIMEText
 from smtplib import SMTP_SSL
 from multiprocessing import cpu_count
 
+import psutil
 from django.conf import settings
 from django.http import FileResponse
 import random
@@ -94,21 +95,22 @@ class ExecuteCmd:
         self.cmd = cmd
 
     def execute(self):
-        p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
+        p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        logger.info("命令执行进程启动，进程号: {}", p.pid)
         # 判断命令是否执行成功
         while True:
             status = p.poll()
             if status is not None:
                 logger.info("实验已结束，状态码：{}", status)
                 if self.terminate:
-                    output = '主动结束实验'
-                    errs = '主动结束实验'
+                    output = '主动中断实验'
+                    errs = '主动中断实验'
                 else:
                     output, errs = p.communicate()
                 if status == 0:
                     logger.info('[SUCCESS] {}', self.cmd)
                     return status, output
-                elif status == 1:
+                elif status == 1 or status == 15:
                     logger.error('[ERROR] command: {}; message: {}', self.cmd, errs)
                     return status, errs
                 else:
@@ -116,10 +118,21 @@ class ExecuteCmd:
                     return status, 'Unknown Error'
             else:
                 if self.terminate:
-                    p.terminate()
+                    kill(p.pid)
                     logger.info("用户主动结束实验进程，命令内容：{}", self.cmd)
             time.sleep(10)
 
+
+def kill(proc_pid):
+    """
+    中断传入进程号的进程及其子进程
+
+    :param proc_pid: 进程号
+    """
+    process = psutil.Process(proc_pid)
+    for proc in process.children(recursive=True):
+        proc.kill()
+    process.kill()
 
 def read_file_str(file_path):
     """

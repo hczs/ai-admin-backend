@@ -97,6 +97,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         file_size = my_file.size
         # 检验是否重复
         original_file_name, ext = os.path.splitext(my_file.name)
+        original_file_name = str(self.request.user.id) + '_' + original_file_name
         enable, file_path = dataset_duplication_handle(original_file_name, ext, path)  # zip文件路径
         if not enable:
             return False
