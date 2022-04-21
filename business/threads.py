@@ -148,14 +148,14 @@ class ExpChildThread(threading.Thread):
             evaluate_insert(task)
             # 生成dataset和result对比的地图文件
             generate_result_map(task)
-        if status == 1:
+        else:
             # 更新任务状态，表示执行出错
             task.task_status = TaskStatusEnum.ERROR.value
         task.execute_end_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())  # 任务结束时间
         # 更新执行信息
         try:
             if type(output) == str:
-                task.execute_msg = str(output)
+                task.execute_msg = output
             else:
                 task.execute_msg = str(output, "utf-8")
         except Exception as e:
