@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import random
@@ -405,7 +406,12 @@ class TaskViewSet(ModelViewSet):
         else:
             # 证明没有对应日志文件，直接生成文件返回
             file_obj = tempfile.NamedTemporaryFile()
-            file_obj.name = 'error.log'
+            # 获取当前时间 yyyy-MM-dd hh:mm:ss
+            now_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # 文件命名 实验号 + 实验名称 + 模型 + 数据集 + 时间
+            file_obj.name = '{}_{}_{}_{}_{}.log'.format(task.exp_id, task.task_name, task.model, task.dataset, now_time)
+            if task.execute_msg is None:
+                task.execute_msg = ''
             file_obj.write(task.execute_msg.encode('utf-8'))
             file_obj.seek(0)
             response_file = FileResponse(file_obj)
