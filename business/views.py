@@ -122,7 +122,7 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                     f.write(chunk)
         account = self.request.user  # 上传的时候添加创建者
         is_public = 1 if self.is_public == 'true' else 0
-        serializer.save(file_name=file_name, file_path=file_path, file_size=file_size, creator=account,
+        serializer.save(file_name=file_name, file_original_name=my_file.name, file_path=file_path, file_size=file_size, creator=account,
                         extract_path=extract_path, dataset_status=DatasetStatusEnum.CHECK.value,
                         visibility=is_public)
         logger.info('文件上传完毕，文件名: ' + file_name)
@@ -271,13 +271,16 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         """
         dataset = self.get_object()
         cur_file_name = dataset.file_name
+        original_file_name = dataset.file_original_name
         for file_name in settings.COMPLETED:
             if file_name == cur_file_name:
                 # remove掉这一条记录
                 settings.COMPLETED.remove(file_name)
                 logger.debug('after remove completed: {}', settings.COMPLETED)
                 res_data = {
-                    "file_name": file_name
+                    "file_name": file_name,
+                    "original_file_name": original_file_name,
+                    'dataset_status': dataset.dataset_status
                 }
                 return Response(status=status.HTTP_200_OK, data=res_data)
         return Response(status=status.HTTP_202_ACCEPTED)

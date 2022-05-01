@@ -18,7 +18,7 @@ from sklearn import preprocessing
 import numpy as np
 
 
-def transfer_geo_json(url, file, background_id):
+def transfer_geo_json(url, file, background_id, error_message_list):
     """
     通过文件路径获取geojson文件，根据文件的类型进行可视化
     """
@@ -30,19 +30,19 @@ def transfer_geo_json(url, file, background_id):
             if json_file.count('_truth_dyna') > 0:
                 pass
             else:
-                file_view_status = show_geo_view(url, json_file, file, background_id)
+                file_view_status = show_geo_view(url, json_file, file, background_id, error_message_list)
                 return file_view_status
         elif json_file.count('grid') > 0:
-            file_view_status = show_geo_view(url, json_file, file, background_id)
+            file_view_status = show_geo_view(url, json_file, file, background_id, error_message_list)
             return file_view_status
         elif json_file.count('od') > 0:
-            file_view_status = show_geo_view(url, json_file, file, background_id)
+            file_view_status = show_geo_view(url, json_file, file, background_id, error_message_list)
             return file_view_status
         elif json_file.count('geo') > 0:
-            file_view_status = show_geo_view(url, json_file, file, background_id)
+            file_view_status = show_geo_view(url, json_file, file, background_id, error_message_list)
             return file_view_status
         else:
-            file_view_status = show_data_statis(url, file)
+            file_view_status = show_data_statis(url, file, error_message_list)
             return file_view_status
 
 
@@ -229,7 +229,7 @@ def add_choropleth(csv_url, m, state_geo, tag1=None, tag2=None, name="choropleth
         folium.GeoJsonTooltip(fields=['geo_id', tag1, tag2],).add_to(cp.geojson)
 
 
-def show_geo_view(url, json_file, file, background_id):
+def show_geo_view(url, json_file, file, background_id, error_message_list):
     """
     解析json文件并按照不同的展示规则进行展示
     """
@@ -279,6 +279,7 @@ def show_geo_view(url, json_file, file, background_id):
                     add_choropleth(csv_url, m, state_geo=geo_layer, tag1='inflow', tag2='outflow', name='Cor')
                 except Exception as ex:
                     logger.error('show_geo_view add_Choropleth 异常：{}', ex)
+                    error_message_list.append('数据集添加分级图异常：{}'.format(ex))
                 # 有分级图就不加热力图了
                 # HeatMap(heat_minmax, name='total_flow_heatmap').add_to(m)
                 # 分级图就不加原来的geojson了，直接显示分级图
@@ -295,6 +296,7 @@ def show_geo_view(url, json_file, file, background_id):
                     add_choropleth(csv_url, m, state_geo=geo_layer, tag1='flow', name='Choropleth of outflow')
                 except Exception as ex:
                     logger.error('show_geo_view add_Choropleth 异常：{}', ex)
+                    error_message_list.append('数据集添加分级图异常：{}'.format(ex))
                 # 分级图就不加原来的geojson了，直接显示分级图
                 # folium.GeoJson(geo_layer, name=f"{json_file}", tooltip=f"{json_file}").add_to(m)
             elif 'length' in feature_list:
@@ -361,9 +363,10 @@ def show_geo_view(url, json_file, file, background_id):
             logger.info(geo_layer + '文件的地理图象绘制成功')
         except Exception as ex:
             logger.error('show_geo_view异常：{}', ex)
-            file_view_status = show_data_statis(url, file)
+            error_message_list.append('地理图象绘制异常：{}'.format(ex))
+            file_view_status = show_data_statis(url, file, error_message_list)
     else:
-        file_view_status = show_data_statis(url, file)
+        file_view_status = show_data_statis(url, file, error_message_list)
     return file_view_status
 
 
@@ -386,7 +389,7 @@ def return_location(block):
     return location
 
 
-def make_statis_only(data, file, tag, name, grid=False, gridod=False):
+def make_statis_only(data, file, tag, name, error_message_list, grid=False, gridod=False):
     """
     利用只有一个参数，获取统计图象
     """
@@ -403,6 +406,7 @@ def make_statis_only(data, file, tag, name, grid=False, gridod=False):
         except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
             logger.error('make_statis_only: 统计图象绘制异常(not grid)：{}', ex)
+            error_message_list.append('统计图象绘制异常(not grid)：{}'.format(ex))
     elif grid:
         try:
             grid_pic_value = []
@@ -419,6 +423,7 @@ def make_statis_only(data, file, tag, name, grid=False, gridod=False):
         except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
             logger.error('make_statis_only: 统计图象绘制异常(grid)：{}', ex)
+            error_message_list.append('统计图象绘制异常(grid)：{}'.format(ex))
     elif gridod:
         try:
             grid_pic_value = []
@@ -433,13 +438,15 @@ def make_statis_only(data, file, tag, name, grid=False, gridod=False):
         except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
             logger.error('make_statis_only: 统计图象绘制异常(gridod)：{}', ex)
+            error_message_list.append('统计图象绘制异常(gridod)：{}'.format(ex))
     else:
         file_view_status = DatasetStatusEnum.ERROR.value
         logger.error('make_statis_only: 统计图象绘制异常(grid)：{}')
+        error_message_list.append('统计图象绘制异常，无法识别文件类型')
     return file_view_status
 
 
-def make_statis_double(data, file, tag1, tag2, name, grid=False):
+def make_statis_double(data, file, tag1, tag2, name, error_message_list, grid=False):
     """
     利用两个参数，获取统计图象
     """
@@ -458,6 +465,7 @@ def make_statis_double(data, file, tag1, tag2, name, grid=False):
         except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
             logger.error('make_statis_double: 统计图象绘制异常(not grid)：{}', ex)
+            error_message_list.append('统计图象绘制异常(not grid)：{}'.format(ex))
     else:
         try:
             grid_pic_value = []
@@ -472,10 +480,11 @@ def make_statis_double(data, file, tag1, tag2, name, grid=False):
         except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
             logger.error('make_statis_double: 统计图象绘制异常(grid)：{}', ex)
+            error_message_list.append('统计图象绘制异常(grid)：{}'.format(ex))
     return file_view_status
 
 
-def show_data_statis(url, file):
+def show_data_statis(url, file, error_message_list):
     """
     如果无法展示其地理图象则将其描述性统计数据展示
     """
@@ -485,60 +494,72 @@ def show_data_statis(url, file):
             logger.info('尝试绘制' + files + '文件的[dyna]统计图象')
             data = pd.read_csv(settings.DATASET_PATH + file + os.sep + files, index_col='dyna_id')
             if 'traffic_flow' in data:
-                file_view_status = make_statis_only(data, file, tag='traffic_flow', name='total_traffic_flow')
+                file_view_status = make_statis_only(data, file, tag='traffic_flow', name='total_traffic_flow',
+                                                    error_message_list=error_message_list)
                 return file_view_status
             elif 'in_flow' in data and 'out_flow' in data:
-                file_view_status = make_statis_double(data, file, 'in_flow', 'out_flow', 'total_flow')
+                file_view_status = make_statis_double(data, file, 'in_flow', 'out_flow', 'total_flow',
+                                                      error_message_list)
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'total_flow')
+                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'total_flow', error_message_list)
                 return file_view_status
             elif 'pickup' in data and 'dropoff' in data:
-                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'total_quantity')
+                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'total_quantity', error_message_list)
                 return file_view_status
             elif 'traffic_speed' in data:
-                file_view_status = make_statis_only(data, file, tag='traffic_speed', name='traffic_speed')
+                file_view_status = make_statis_only(data, file, tag='traffic_speed', name='traffic_speed',
+                                                    error_message_list=error_message_list)
                 return file_view_status
             elif 'traffic_intensity' in data:
-                file_view_status = make_statis_only(data, file, tag='traffic_intensity', name='traffic_intensity')
+                file_view_status = make_statis_only(data, file, tag='traffic_intensity', name='traffic_intensity',
+                                                    error_message_list=error_message_list)
                 return file_view_status
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
                 logger.error('show_data_statis dyna 未找到可绘制的属性：{}', data)
+                error_message_list.append('dyna 未找到可绘制的属性：{}'.format(data))
                 return file_view_status
         elif files.count('grid') > 0 and files.count('gridod') == 0:
             logger.info('尝试绘制' + files + '文件的[grid]统计图象')
             data = pd.read_csv(settings.DATASET_PATH + file + '/' + files, index_col='dyna_id')
             # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
             if 'risk' in data:
-                file_view_status = make_statis_only(data, file, tag='risk', name='risk', grid=True)
+                file_view_status = make_statis_only(data, file, tag='risk', name='risk', grid=True,
+                                                    error_message_list=error_message_list)
                 return file_view_status
             elif 'inflow' in data and 'outflow' in data:
-                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'total_flow', grid=True)
+                file_view_status = make_statis_double(data, file, 'inflow', 'outflow', 'total_flow',
+                                                      error_message_list=error_message_list, grid=True)
                 return file_view_status
             elif 'new_flow' in data and 'end_flow' in data:
-                file_view_status = make_statis_double(data, file, 'new_flow', 'end_flow', 'new&end_flow', grid=True)
+                file_view_status = make_statis_double(data, file, 'new_flow', 'end_flow', 'new&end_flow',
+                                                      error_message_list=error_message_list, grid=True)
                 return file_view_status
             elif 'pickup' in data and 'dropoff' in data:
-                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'total_quantity', grid=True)
+                file_view_status = make_statis_double(data, file, 'pickup', 'dropoff', 'total_quantity',
+                                                      error_message_list=error_message_list, grid=True)
                 return file_view_status
             elif 'departing_volume' in data and 'arriving_volume' in data:
                 file_view_status = make_statis_double(data, file, 'departing_volume', 'arriving_volume', 'total_volume',
-                                                      grid=True)
+                                                      error_message_list=error_message_list, grid=True)
                 return file_view_status
             elif 'flow' in data:
-                file_view_status = make_statis_only(data, file, tag='flow', name='flow', grid=True)
+                file_view_status = make_statis_only(data, file, tag='flow', name='flow',
+                                                    error_message_list=error_message_list, grid=True)
                 return file_view_status
             else:
                 file_view_status = DatasetStatusEnum.ERROR.value
                 logger.error('show_data_statis grid 未找到可绘制的属性：{}', data)
+                error_message_list.append('grid 未找到可绘制的属性：{}'.format(data))
                 return file_view_status
         elif files.count('gridod') > 0:
             logger.info('尝试绘制' + files + '文件的[gridod]统计图象')
             data = dd.read_csv(settings.DATASET_PATH + file + '/' + files)
             # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
             if 'flow' in data:
-                file_view_status = make_statis_only(data, file, tag='flow', name='flow(daily)', gridod=True)
+                file_view_status = make_statis_only(data, file, tag='flow', name='flow(daily)',
+                                                    error_message_list=error_message_list, gridod=True)
                 return file_view_status
 
 
@@ -620,7 +641,7 @@ class VisHelper:
     生成json处理类
     """
 
-    def __init__(self, dataset, save_path):
+    def __init__(self, dataset, save_path, error_message_list):
         try:
             self.raw_path = settings.DATASET_PATH
             logger.info('当前配置数据集存储路径 raw_data 路径为：{}', self.raw_path)
@@ -629,6 +650,7 @@ class VisHelper:
             self.save_path = save_path
             logger.info("当前数据集生成的 geojson 文件存储路径为：{}", self.save_path)
             self.file_form_status = DatasetStatusEnum.ERROR.value
+            self.error_message_list = error_message_list
             # get type
             self.config_path = self.raw_path + self.dataset + os.sep + 'config.json'
             logger.info("当前数据集 config.json 文件路径为：{}", self.config_path)
@@ -671,6 +693,7 @@ class VisHelper:
                 assert len(self.geo_file) == 1
             except Exception as ex:
                 logger.error('文件当中没有geo文件, 异常信息：{}', ex)
+                error_message_list.append('文件当中没有geo文件, 异常信息：{}'.format(ex))
 
             # reserved columns
             self.geo_reserved_lst = ['type', 'coordinates']
@@ -681,6 +704,7 @@ class VisHelper:
                                         'destination_row_id', 'destination_column_id']
         except Exception as ex:
             logger.error('解析数据集失败，config文件无法识别或文件夹为空, 异常信息：{}', ex)
+            error_message_list.append('解析数据集失败，config文件无法识别或文件夹为空, 异常信息：{}'.format(ex))
 
     def visualize(self):
         """
@@ -694,6 +718,7 @@ class VisHelper:
                     self._visualize_geo()
                 except Exception as ex:
                     logger.error('（trajectory）：文件当中没有geo文件或geo文件解析失败, 异常信息：{}', ex)
+                    self.error_message_list.append('（trajectory）：文件当中没有geo文件或geo文件解析失败, 异常信息：{}'.format(ex))
                 # dyna
                 for dyna_file in self.dyna_file:
                     try:
@@ -701,6 +726,7 @@ class VisHelper:
                         self._visualize_dyna()
                     except Exception as ex:
                         logger.error('（trajectory）：文件当中没有dyna文件或dyna文件解析失败, 异常信息：{}', ex)
+                        self.error_message_list.append('（trajectory）：文件当中没有dyna文件或dyna文件解析失败, 异常信息：{}'.format(ex))
             elif self.type == 'state':
                 self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
                 for dyna_file in self.dyna_file:
@@ -723,8 +749,10 @@ class VisHelper:
                     self._visualize_od()
             self.file_form_status = DatasetStatusEnum.PROCESSING_COMPLETE.value
             return self.file_form_status
-        except Warning:
-            return self.file_form_status
+        except Exception as ex:
+            logger.error("visualize：解析数据集失败，异常信息：{}", ex)
+            self.error_message_list.append("可视化数据集失败，异常信息：{}".format(ex))
+            return DatasetStatusEnum.ERROR.value
 
     def _visualize_state(self):
         """
@@ -980,6 +1008,7 @@ class VisHelper:
                         i += 1
                     except Exception as ex:
                         logger.error('dyna_file 无法找到位置信息，异常信息：{}', ex)
+                        self.error_message_list.append('dyna 文件无法找到位置信息，异常信息：{}'.format(ex))
                 else:
                     break
                 if len(feature_i['geometry']['coordinates']) > 0:
@@ -1038,17 +1067,18 @@ def ensure_dir(dir_path):
         os.makedirs(dir_path)
 
 
-def get_geo_json(dataset, save_path):
+def get_geo_json(dataset, save_path, error_message_list):
     """
     生成geojson文件
     """
     try:
-        helper = VisHelper(dataset, save_path)
+        helper = VisHelper(dataset, save_path, error_message_list)
         file_form_status = helper.visualize()
         return file_form_status
     except Exception as ex:
         file_form_status = DatasetStatusEnum.ERROR.value
         logger.error('get_geo_json生成geojson出现异常：{}', ex)
+        error_message_list.append('数据集解析异常，请检查数据集格式，异常信息：{}'.format(ex))
         return file_form_status
 
 

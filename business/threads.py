@@ -198,7 +198,8 @@ class ExecuteGeojsonThread(threading.Thread):
                 if (ext != "" or len(ext) != 0) and tmp_name:
                     extract_without_folder(f, every, self.extract_path)
             zip_file.close()
-        file_form_status = get_geo_json(self.file_name, self.extract_path + '_geo_json')
+        error_message_list = []
+        file_form_status = get_geo_json(self.file_name, self.extract_path + '_geo_json', error_message_list)
         if file_form_status == DatasetStatusEnum.PROCESSING_COMPLETE.value:
             logger.info(self.file_name + ' geojson文件生成完毕')
             # 处理完毕，更新数据集状态
@@ -206,6 +207,9 @@ class ExecuteGeojsonThread(threading.Thread):
         else:
             logger.error(self.file_name + ' 无法生成geojson文件')
             file_obj.dataset_status = file_form_status
+        if len(error_message_list) > 0:
+            file_obj.error_message = "\n".join(error_message_list)
+            file_obj.dataset_status = DatasetStatusEnum.ERROR.value
         file_obj.save()
         settings.IN_PROGRESS.remove(self.file_name)
         settings.COMPLETED.append(self.file_name)
@@ -231,20 +235,23 @@ class ExecuteGeoViewThread(threading.Thread):
         settings.IN_PROGRESS.append(self.file_name)
         file_obj = File.objects.get(file_name=self.file_name)
         file_view_status = DatasetStatusEnum.PROCESSING.value
+        error_message_list = []
         try:
             if os.listdir(self.extract_path + '_geo_json') is not None:
                 file_view_status = transfer_geo_json(self.extract_path + '_geo_json', self.file_name,
-                                                     self.background_id)
+                                                     self.background_id, error_message_list)
                 logger.info("文件可视化完毕，文件状态：{}", file_view_status)
         except Exception as ex:
             file_view_status = DatasetStatusEnum.ERROR.value
             logger.error('ExecuteGeoViewThread transfer_geo_json 异常：{}', ex)
+            error_message_list.append('数据集可视化失败，异常信息：' + str(ex))
         # 处理完毕，更新数据集状态
         if file_view_status == DatasetStatusEnum.SUCCESS.value or file_view_status == DatasetStatusEnum.SUCCESS_stat.value:
             logger.info(self.file_name + "数据可视化处理完毕")
         else:
             logger.info(self.file_name + "数据可视化处理失败")
         file_obj.dataset_status = file_view_status
+        file_obj.error_message = '\n'.join(error_message_list)
         file_obj.save()
         settings.IN_PROGRESS.remove(self.file_name)
         settings.COMPLETED.append(self.file_name)
