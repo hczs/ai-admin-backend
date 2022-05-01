@@ -9,6 +9,8 @@ from common.models import BaseModel
 
 class File(BaseModel):
     file_name = models.CharField(max_length=50, null=True)
+    # 数据集原始命名
+    file_original_name = models.CharField(max_length=50, null=True)
     file_size = models.BigIntegerField(null=True)
     file_path = models.CharField(max_length=200, null=True)
     extract_path = models.CharField(max_length=200, null=True)

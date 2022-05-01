@@ -361,7 +361,7 @@ def send_mail(subject, message, to_address):
         logger.error("发送邮件异常，目标邮箱：{}  异常信息：{}", to_address, ex)
 
 
-def extract_without_folder(arc_name, full_item_name, folder):
+def extract_without_folder(arc_name, full_item_name, folder, file_prefix=None):
     """
     解压压缩包中的指定文件到指定目录
 
@@ -373,7 +373,12 @@ def extract_without_folder(arc_name, full_item_name, folder):
         file_data = zf.read(full_item_name)
     # 中文乱码解决
     full_item_name = full_item_name.encode('cp437').decode('gbk')
-    with open(os.path.join(folder, os.path.basename(full_item_name)), "wb") as file_out:
+    original_file_name, ext = os.path.splitext(os.path.basename(full_item_name))
+    if ext != '.json' and file_prefix is not None:
+        original_file_name = file_prefix + '_' + original_file_name + ext
+    else:
+        original_file_name = original_file_name + ext
+    with open(os.path.join(folder, original_file_name), "wb") as file_out:
         file_out.write(file_data)
 
 
