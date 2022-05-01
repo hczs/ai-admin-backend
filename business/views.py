@@ -279,7 +279,8 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
                 logger.debug('after remove completed: {}', settings.COMPLETED)
                 res_data = {
                     "file_name": file_name,
-                    "original_file_name": original_file_name
+                    "original_file_name": original_file_name,
+                    'dataset_status': dataset.dataset_status
                 }
                 return Response(status=status.HTTP_200_OK, data=res_data)
         return Response(status=status.HTTP_202_ACCEPTED)

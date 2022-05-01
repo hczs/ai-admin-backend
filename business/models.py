@@ -15,6 +15,7 @@ class File(BaseModel):
     file_path = models.CharField(max_length=200, null=True)
     extract_path = models.CharField(max_length=200, null=True)
     creator = models.ForeignKey(Account, null=True, default=None, db_constraint=False, on_delete=models.SET_NULL)
+    error_message = models.TextField(null=True)
     # 地图底图id
     background_id = models.IntegerField(default=1)
     # 数据集状态 0 处理中 1 处理完成
