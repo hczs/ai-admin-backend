@@ -438,6 +438,7 @@ class TaskViewSet(ModelViewSet):
         # 如果exp_id没传入，就随机生成
         if task.exp_id is None:
             task.exp_id = int(random.SystemRandom().random() * 100000)
+            task.save()
         str_command = 'python ' + settings.RUN_MODEL_PATH + ' --exp_id ' + str(task.exp_id)
         for param in task_param:
             param_value = getattr(task, param)
