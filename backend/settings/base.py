@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/3.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
+import multiprocessing
 import queue
 
 from datetime import timedelta
@@ -188,7 +189,7 @@ logger.add("./log/file_{time}.log", rotation="10 MB", encoding="utf-8")
 logger.info("base.py settings loading")
 
 # 全局日志队列，存放日志name，监控新增日志，从队列中取出set进入task对象
-LOG_QUEUE = queue.Queue()
+LOG_QUEUE = multiprocessing.Queue()
 
 # 邮件发送相关
 # 邮件发送者邮箱地址
