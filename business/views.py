@@ -183,6 +183,10 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         dataset.save()
         return Response(status=status.HTTP_200_OK)
 
+    @action(methods=['get'], detail=True)
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
+
     def perform_destroy(self, instance):
         """
         执行删除数据集方法
@@ -327,6 +331,10 @@ class TaskViewSet(ModelViewSet):
                 # 这里可以保证 creator 有值，且是本人 且 想要查询自己带可视条件的值
                 self.queryset = self.queryset.filter(creator_id=creator, visibility=visibility)
         return super(TaskViewSet, self).list(self, request, *args, **kwargs)
+
+    @action(methods=['get'], detail=True)
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
 
     @action(methods=['get'], detail=True)
     def test(self, *args, **kwargs):

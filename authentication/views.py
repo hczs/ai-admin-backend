@@ -143,6 +143,10 @@ class AccountViewSet(ModelViewSet):
 
         return Response(serializer.data)
 
+    @action(methods=['get'], detail=True)
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         # 检查是否是系统保留账户，系统保留账户不可删除
@@ -224,6 +228,10 @@ class RoleViewSet(ModelViewSet):
             return Response(status=status.HTTP_200_OK)
         else:
             return Response(data={'msg': '角色已存在！', 'id': roles[0].id}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True)
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
