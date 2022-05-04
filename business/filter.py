@@ -13,7 +13,7 @@ class FileFilter(FilterSet):
     begin = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='gte')
     end = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='lte')
     # 文件名模糊查询
-    file_name = django_filters.CharFilter(field_name='file_name', lookup_expr='icontains')
+    file_name = django_filters.CharFilter(field_name='file_original_name', lookup_expr='icontains')
     # 创建者精确查询
     # creator = django_filters.ModelChoiceFilter(queryset=Account.objects.all())
     # 私有 或 公开查询
@@ -32,7 +32,7 @@ class TaskFilter(FilterSet):
     begin = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='gte')
     end = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='lte')
     # 任务名模糊查询
-    task_name = django_filters.CharFilter(field_name='task_name', lookup_expr='icontains')
+    task_name = django_filters.CharFilter(field_name='task_name_show', lookup_expr='icontains')
     # 任务类型精确查询
     task = django_filters.CharFilter(field_name='task')
     # 任务状态精确查询
