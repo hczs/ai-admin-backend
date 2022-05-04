@@ -41,7 +41,7 @@ EVALUATE_PATH_PREFIX = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'cache' + os
 EVALUATE_PATH_SUFFIX = os.sep + 'evaluate_cache' + os.sep
 # run_model.py脚本文件位置
 RUN_MODEL_PATH = 'run_model.py'
-# 激活libcity库虚拟环境命令
+# 激活libcity库虚拟环境命令 配置为 None 就是使用默认环境
 ACTIVE_VENV = 'source /root/Bigscity-LibCity/libcity_venv/bin/activate'
 # libcity的log目录
 LOG_PATH = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'log' + os.sep

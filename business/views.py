@@ -183,6 +183,10 @@ class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListM
         dataset.save()
         return Response(status=status.HTTP_200_OK)
 
+    @action(methods=['get'], detail=True)
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
+
     def perform_destroy(self, instance):
         """
         执行删除数据集方法
@@ -329,6 +333,10 @@ class TaskViewSet(ModelViewSet):
         return super(TaskViewSet, self).list(self, request, *args, **kwargs)
 
     @action(methods=['get'], detail=True)
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
+
+    @action(methods=['get'], detail=True)
     def test(self, *args, **kwargs):
         """
         测试接口，用于测试结果文件生成
@@ -438,6 +446,7 @@ class TaskViewSet(ModelViewSet):
         # 如果exp_id没传入，就随机生成
         if task.exp_id is None:
             task.exp_id = int(random.SystemRandom().random() * 100000)
+            task.save()
         str_command = 'python ' + settings.RUN_MODEL_PATH + ' --exp_id ' + str(task.exp_id)
         for param in task_param:
             param_value = getattr(task, param)

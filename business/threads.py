@@ -50,7 +50,8 @@ class ExecuteCommandThread(threading.Thread):
         task.task_status = TaskStatusEnum.IN_PROGRESS.value
         task.save()
         # 执行
-        self.str_command = settings.ACTIVE_VENV + ' && ' + self.str_command
+        if settings.ACTIVE_VENV is not None:
+            self.str_command = settings.ACTIVE_VENV + ' && ' + self.str_command
         # Linux系统下需要对圆括号进行转义
         if platform.system().lower() == 'linux':
             self.str_command = parentheses_escape(self.str_command)

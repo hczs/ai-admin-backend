@@ -34,6 +34,7 @@ class File(BaseModel):
 
 class Task(BaseModel):
     task_name = models.CharField(max_length=50, unique=True)
+    task_name_show = models.CharField(max_length=50, null=True)
     task_description = models.CharField(max_length=150, null=True)
     creator = models.ForeignKey(Account, null=True, db_constraint=False, on_delete=models.SET_NULL)
     execute_time = models.DateTimeField(null=True)
