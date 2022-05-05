@@ -210,7 +210,7 @@ class ExecuteGeojsonThread(threading.Thread):
             file_obj.dataset_status = file_form_status
         if len(error_message_list) > 0:
             file_obj.error_message = "\n".join(error_message_list)
-            file_obj.dataset_status = DatasetStatusEnum.ERROR.value
+            # file_obj.dataset_status = DatasetStatusEnum.ERROR.value
         file_obj.save()
         settings.IN_PROGRESS.remove(self.file_name)
         settings.COMPLETED.append(self.file_name)
