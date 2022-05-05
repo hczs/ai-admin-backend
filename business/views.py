@@ -334,6 +334,9 @@ class TaskViewSet(ModelViewSet):
 
     @action(methods=['get'], detail=True)
     def delete(self, request, *args, **kwargs):
+        task = self.get_object()
+        # 删除实验的时候把预约的实验也删了
+        remove_task(str(task.id))
         return self.destroy(request, *args, **kwargs)
 
     @action(methods=['get'], detail=True)
@@ -437,8 +440,9 @@ class TaskViewSet(ModelViewSet):
         """
         execute_time = request.query_params.get('execute_time')
         task = self.get_object()
-        # 检查任务是否可执行
-        if task.task_status != TaskStatusEnum.NOT_STARTED.value and task.task_status != TaskStatusEnum.ERROR.value:
+        # 检查任务是否可执行 未开始 和 错误 和 已选择预约时间 三种情况 可以继续往下走
+        if task.task_status != TaskStatusEnum.NOT_STARTED.value and task.task_status != TaskStatusEnum.ERROR.value\
+                and task.task_status != TaskStatusEnum.SELECTED_EXECUTE_TIME.value:
             return Response(data={'detail': '任务正在执行中或已完成，请勿重复执行！'}, status=status.HTTP_400_BAD_REQUEST)
         # 获取任务数据，组装命令
         task_param = ['task', 'model', 'dataset', 'config_file', 'saved_model', 'train', 'batch_size', 'train_rate',
@@ -458,8 +462,6 @@ class TaskViewSet(ModelViewSet):
         # 检查任务是否已经加入过队列中，如果已经存在，把之前的移除，以本次提交为准
         if task_is_exists(str(task.id)):
             remove_task(str(task.id))
-        # 添加任务到执行队列中，不传execute_time就代表立即执行
-        task_execute_at(task.task_name, str_command, execute_time, str(task.id))
         # 更新任务执行时间信息
         if execute_time:
             task.execute_time = execute_time
@@ -471,6 +473,8 @@ class TaskViewSet(ModelViewSet):
                 task.task_status == TaskStatusEnum.SELECTED_EXECUTE_TIME.value:
             task.execute_end_time = None
         task.save()
+        # 添加任务到执行队列中，不传execute_time就代表立即执行
+        task_execute_at(task.task_name, str_command, execute_time, str(task.id))
         return Response(status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=True)
