@@ -31,8 +31,7 @@ class ExecuteCommandThread(threading.Thread):
         # 从队列中取出放入数据库
         log_name = settings.LOG_QUEUE.get()
         logger.info('set_log_file-日志文件名称: {}', log_name)
-        task.log_file_name = log_name
-        task.save()
+        Task.objects.filter(id=task.id).update(log_file_name=log_name)
 
     def run(self):
         # 获取当前工作目录做备份
@@ -210,7 +209,7 @@ class ExecuteGeojsonThread(threading.Thread):
             file_obj.dataset_status = file_form_status
         if len(error_message_list) > 0:
             file_obj.error_message = "\n".join(error_message_list)
-            file_obj.dataset_status = DatasetStatusEnum.ERROR.value
+            # file_obj.dataset_status = DatasetStatusEnum.ERROR.value
         file_obj.save()
         settings.IN_PROGRESS.remove(self.file_name)
         settings.COMPLETED.append(self.file_name)
