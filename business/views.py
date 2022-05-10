@@ -625,7 +625,7 @@ class TrafficStateEtaViewSet(ModelViewSet):
         with open(default_evaluate_config, 'r', encoding='UTF-8') as f:
             json_dict = json.load(f)
         for key in json_dict:
-            if key == "mode":
+            if key == "evaluator_mode":
                 res_data = {
                     "mode": json_dict[key]
                 }
