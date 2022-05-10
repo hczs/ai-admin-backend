@@ -574,7 +574,7 @@ def form_statis_html(value_dict, asix_x, file, name1=None, name2=None):
                .set_global_opts(
             title_opts=opts.TitleOpts(title=str("mean of " + name1), subtitle="Keep 1 decimal place (0.1)",
                                       pos_left='80%', ),
-            xaxis_opts=opts.AxisOpts(name='geo_id', splitline_opts=opts.SplitLineOpts(is_show=True)),
+            xaxis_opts=opts.AxisOpts(name='entity_id', splitline_opts=opts.SplitLineOpts(is_show=True)),
             yaxis_opts=opts.AxisOpts(name='value of ' + name1, splitline_opts=opts.SplitLineOpts(is_show=True)),
             toolbox_opts=opts.ToolboxOpts(
                 is_show=True,
@@ -590,7 +590,7 @@ def form_statis_html(value_dict, asix_x, file, name1=None, name2=None):
                .set_global_opts(
             title_opts=opts.TitleOpts(title=str("mean of " + name1 + ' & ' + name2),
                                       subtitle="Keep 1 decimal place (0.1)", pos_left='80%', ),
-            xaxis_opts=opts.AxisOpts(name='geo_id', splitline_opts=opts.SplitLineOpts(is_show=True)),
+            xaxis_opts=opts.AxisOpts(name='entity_id', splitline_opts=opts.SplitLineOpts(is_show=True)),
             yaxis_opts=opts.AxisOpts(name=name1 + ' & ' + name2 + ' value',
                                      splitline_opts=opts.SplitLineOpts(is_show=True)),
             toolbox_opts=opts.ToolboxOpts(
