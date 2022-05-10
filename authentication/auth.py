@@ -3,6 +3,7 @@ import hashlib
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
+from loguru import logger
 from rest_framework import exceptions
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -25,6 +26,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             if not check_password(attrs['password'], account.password):
                 raise AuthenticationFailed
         except Exception as e:
+            logger.error('账号登录异常：{}'.format(e))
             raise AuthenticationFailed
 
         refresh = self.get_token(account)
