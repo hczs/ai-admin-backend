@@ -176,14 +176,14 @@ class AccountViewSet(ModelViewSet):
         }
         return Response(data)
 
-    @swagger_auto_schema(methods=['put'], request_body=openapi.Schema(
+    @swagger_auto_schema(methods=['post'], request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
         required=['old_password', 'new_password', 'new_password_repeat'],
         properties={'old_password': openapi.Schema(type=openapi.TYPE_STRING),
                     'new_password': openapi.Schema(type=openapi.TYPE_STRING),
                     'new_password_repeat': openapi.Schema(type=openapi.TYPE_STRING)}
     ))
-    @action(methods=['put'], detail=False, permission_classes=[IsAuthenticated], url_name='change_password')
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_name='change_password')
     def password(self, request):
         """
         修改密码
