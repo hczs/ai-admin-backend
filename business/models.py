@@ -3,6 +3,8 @@ from django.utils import timezone
 from django.db import models
 
 # Create your models here.
+from loguru import logger
+
 from authentication.models import Account
 from common.models import BaseModel
 

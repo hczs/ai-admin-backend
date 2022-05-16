@@ -1,7 +1,7 @@
 import os
 
 from .base import *
-from watchdog.observers import Observer
+
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -14,13 +14,11 @@ DATABASES = {
     # 测试
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'django1',  # 指定的数据库名
+        'NAME': 'django',  # 指定的数据库名
         'USER': 'root',  # 数据库登录的用户名
-        'PASSWORD': 'Boco.123',  # 登录数据库的密码
-        # 'PASSWORD': 'toor',  # 登录数据库的密码
-        'HOST': '10.12.1.50',
-        # 'HOST': '192.168.3.99',
-        'PORT': '3306',
+        'HOST': '127.0.0.1',
+        'PASSWORD': '123456',
+        'PORT': '3366',
     }
 }
 
@@ -59,15 +57,3 @@ TASK_PARAM_PATH = LIBCITY_PATH + os.sep
 DATASET_EXAMPLE_PATH = 'D:\\upload\\raw_data\\METR_LA.zip'
 TASK_PARAM_EXAMPLE_PATH = 'D:\\upload\\param\\config.json'
 ADMIN_FRONT_HTML_PATH = "D:\\vscodework\\bushu\\vue-admin-template-permission-control\\public\\"
-
-
-# 判断目录是否存在，不存在则创建
-if not os.path.isdir(LOG_PATH):
-    logger.info('日志目录不存在，正在创建: {}', LOG_PATH)
-    os.makedirs(LOG_PATH)   # 可生成多层目录
-
-# 监控libcity的log目录
-observer = Observer()
-observer.schedule(logCreateHandler(), LOG_PATH)
-observer.start()
-logger.info('LOG_PATH监控线程已启动，LOG_PATH: {}', LOG_PATH)

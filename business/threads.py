@@ -27,12 +27,6 @@ class ExecuteCommandThread(threading.Thread):
         self.str_command = str_command
         super(ExecuteCommandThread, self).__init__(name=thread_name)
 
-    def set_log_file(self, task):
-        # 从队列中取出放入数据库
-        log_name = settings.LOG_QUEUE.get()
-        logger.info('set_log_file-日志文件名称: {}', log_name)
-        Task.objects.filter(id=task.id).update(log_file_name=log_name)
-
     def run(self):
         # 获取当前工作目录做备份
         backup_dir = os.getcwd()
@@ -56,8 +50,6 @@ class ExecuteCommandThread(threading.Thread):
             self.str_command = parentheses_escape(self.str_command)
         logger.info('execute command: ' + self.str_command)
         ExpChildThread(self.name, self.str_command, backup_dir, task).start()
-        # 执行后set log_file_name
-        self.set_log_file(task)
 
 
 class ExpChildThread(threading.Thread):
