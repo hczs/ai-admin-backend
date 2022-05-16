@@ -41,7 +41,7 @@ class ExecuteCommandThread(threading.Thread):
         # 任务开始执行，变更任务状态
         # 变更任务状态
         task.task_status = TaskStatusEnum.IN_PROGRESS.value
-        task.save()
+        task.save(update_fields=['task_status'])
         # 执行
         if settings.ACTIVE_VENV is not None:
             self.str_command = settings.ACTIVE_VENV + ' && ' + self.str_command
@@ -152,7 +152,7 @@ class ExpChildThread(threading.Thread):
                 task.execute_msg = str(output, "utf-8")
         except Exception as e:
             task.execute_msg = str(e)
-        task.save()
+        task.save(update_fields=['task_status', 'execute_msg'])
         # 返回原工作目录
         os.chdir(self.backup_dir)
         logger.info('execute completed! change path to: ' + os.getcwd())
