@@ -7,6 +7,7 @@ import tempfile
 import time
 import zipfile
 from string import Template
+from urllib.parse import quote
 
 from django.conf import settings
 from django.core.files.uploadedfile import TemporaryUploadedFile
@@ -36,7 +37,6 @@ from business.threads import ExecuteGeojsonThread, ExecuteGeoViewThread
 from common import utils
 from common.response import PassthroughRenderer
 from common.utils import read_file_str, generate_download_file, str_is_empty
-from bs4 import BeautifulSoup
 
 
 class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin, GenericViewSet):
@@ -424,13 +424,20 @@ class TaskViewSet(ModelViewSet):
             now_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             # 文件命名 实验号 + 实验名称 + 模型 + 数据集 + 时间
             file_obj.name = '{}_{}_{}_{}_{}.log'.format(task.exp_id, task.task_name, task.model, task.dataset, now_time)
+            error_log_name = file_obj.name
+            logger.info("生成的日志文件名：{}", error_log_name)
             if task.execute_msg is None:
                 task.execute_msg = ''
             file_obj.write(task.execute_msg.encode('utf-8'))
             file_obj.seek(0)
             response_file = FileResponse(file_obj)
             response_file['content_type'] = "application/octet-stream"
-            response_file['Content-Disposition'] = 'attachment; filename=' + file_obj.name
+            try:
+                error_log_name.encode('ascii')
+                file_expr = 'filename="{}"'.format(error_log_name)
+            except UnicodeEncodeError:
+                file_expr = "filename*=utf-8''{}".format(quote(error_log_name))
+            response_file.headers['Content-Disposition'] = 'attachment; {}'.format(file_expr)
             return response_file
 
     @action(methods=['get'], detail=True)
@@ -585,6 +592,17 @@ class TaskViewSet(ModelViewSet):
         file_id = task.pk  # wheather pk or exp_id
         file_path = settings.RESULT_PATH + str(file_id)
         return Response(file_path)
+
+    @action(methods=['get'], detail=False)
+    def get_task_model_dict(self, request, *args, **kwargs):
+        src_path = settings.TASK_MODEL_PATH
+        task_list = os.listdir(src_path)
+        result_dict = {}
+        # 遍历 task_list
+        for task in task_list:
+            cur_list = list(map(lambda x: os.path.splitext(x)[0], os.listdir(src_path + os.sep + task)))
+            result_dict[task] = cur_list
+        return Response(data=result_dict, status=status.HTTP_200_OK)
 
 
 class TrafficStateEtaViewSet(ModelViewSet):

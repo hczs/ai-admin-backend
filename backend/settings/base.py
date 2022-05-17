@@ -10,7 +10,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 import multiprocessing
-import queue
 
 from datetime import timedelta
 from pathlib import Path
@@ -18,7 +17,6 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 from loguru import logger
 
-from business.handler import logCreateHandler
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -188,14 +186,15 @@ COMPLETED = []
 logger.add("./log/file_{time}.log", rotation="10 MB", encoding="utf-8")
 logger.info("base.py settings loading")
 
+
 # 全局日志队列，存放日志name，监控新增日志，从队列中取出set进入task对象
 LOG_QUEUE = multiprocessing.Queue()
 
 # 邮件发送相关
 # 邮件发送者邮箱地址
-SENDER_ADDRESS = ''
+SENDER_ADDRESS = 'testmail0319@163.com'
 # 邮箱授权码
-SENDER_AUTHORIZATION_CODE = ''
+SENDER_AUTHORIZATION_CODE = 'EHNKGJHRZUFYZEBP'
 # SMTP 服务器地址
 SMTP_SERVER_ADDRESS = 'smtp.163.com'
 # SMTP 服务器端口

@@ -27,12 +27,6 @@ class ExecuteCommandThread(threading.Thread):
         self.str_command = str_command
         super(ExecuteCommandThread, self).__init__(name=thread_name)
 
-    def set_log_file(self, task):
-        # 从队列中取出放入数据库
-        log_name = settings.LOG_QUEUE.get()
-        logger.info('set_log_file-日志文件名称: {}', log_name)
-        Task.objects.filter(id=task.id).update(log_file_name=log_name)
-
     def run(self):
         # 获取当前工作目录做备份
         backup_dir = os.getcwd()
@@ -47,7 +41,7 @@ class ExecuteCommandThread(threading.Thread):
         # 任务开始执行，变更任务状态
         # 变更任务状态
         task.task_status = TaskStatusEnum.IN_PROGRESS.value
-        task.save()
+        task.save(update_fields=['task_status'])
         # 执行
         if settings.ACTIVE_VENV is not None:
             self.str_command = settings.ACTIVE_VENV + ' && ' + self.str_command
@@ -56,8 +50,6 @@ class ExecuteCommandThread(threading.Thread):
             self.str_command = parentheses_escape(self.str_command)
         logger.info('execute command: ' + self.str_command)
         ExpChildThread(self.name, self.str_command, backup_dir, task).start()
-        # 执行后set log_file_name
-        self.set_log_file(task)
 
 
 class ExpChildThread(threading.Thread):
@@ -160,7 +152,7 @@ class ExpChildThread(threading.Thread):
                 task.execute_msg = str(output, "utf-8")
         except Exception as e:
             task.execute_msg = str(e)
-        task.save()
+        task.save(update_fields=['task_status', 'execute_msg'])
         # 返回原工作目录
         os.chdir(self.backup_dir)
         logger.info('execute completed! change path to: ' + os.getcwd())
