@@ -17,6 +17,9 @@ from pathlib import Path
 from loguru import logger
 
 
+import os
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Quick-start development settings - unsuitable for production
@@ -185,7 +188,6 @@ COMPLETED = []
 logger.add("./log/file_{time}.log", rotation="10 MB", encoding="utf-8")
 logger.info("base.py settings loading")
 
-
 # 邮件发送相关
 # 邮件发送者邮箱地址
 SENDER_ADDRESS = ''
@@ -195,3 +197,60 @@ SENDER_AUTHORIZATION_CODE = ''
 SMTP_SERVER_ADDRESS = 'smtp.163.com'
 # SMTP 服务器端口
 SMTP_SERVER_PORT = None
+
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = False
+
+ALLOWED_HOSTS = ['192.168.3.155', '49.233.159.81']
+
+# 数据库
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'django',  # 指定的数据库名
+        'USER': 'root',  # 数据库登录的用户名
+        'PASSWORD': '123456',  # 登录数据库的密码
+        'HOST': '192.168.3.1',
+        'PORT': '3366',
+    }
+}
+
+# 跨域设置
+# 单个配置
+CORS_ORIGIN_WHITELIST = (
+    'http://192.168.3.155:8000',
+    'http://49.233.159.81:12151',
+)
+
+# 允许携带cookie
+CORS_ALLOW_CREDENTIALS = True
+
+# 允许所有主机跨域
+# CORS_ORIGIN_ALLOW_ALL = True
+
+# libcity库程序相关
+# libcity程序目录
+LIBCITY_PATH = '/home/houge/ai-admin/Bigscity-LibCity'
+# 指标文件目录
+EVALUATE_PATH_PREFIX = LIBCITY_PATH + os.sep +'libcity' + os.sep + 'cache' + os.sep
+EVALUATE_PATH_SUFFIX = os.sep + 'evaluate_cache' + os.sep
+# run_model.py脚本文件名称
+RUN_MODEL_PATH = 'run_model.py'
+# 激活libcity库虚拟环境命令
+ACTIVE_VENV = None
+# libcity的log目录
+LOG_PATH = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'log' + os.sep
+
+# 数据集文件上传路径
+DATASET_PATH = LIBCITY_PATH + os.sep + 'raw_data' + os.sep
+# 任务参数json文件上传路径
+TASK_PARAM_PATH = LIBCITY_PATH + os.sep
+
+# 样例文件相关
+# 数据集样例文件
+DATASET_EXAMPLE_PATH = '/home/houge/ai-admin/sample/METR_LA.zip'
+TASK_PARAM_EXAMPLE_PATH = '/home/houge/ai-admin/sample/config.json'
+
+# 前端项目路径
+ADMIN_FRONT_HTML_PATH = "/home/houge/ai-admin/ai-admin-front/dist/"
