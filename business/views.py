@@ -37,7 +37,6 @@ from business.threads import ExecuteGeojsonThread, ExecuteGeoViewThread
 from common import utils
 from common.response import PassthroughRenderer
 from common.utils import read_file_str, generate_download_file, str_is_empty
-from bs4 import BeautifulSoup
 
 
 class FileViewSet(CreateModelMixin, DestroyModelMixin, RetrieveModelMixin, ListModelMixin, GenericViewSet):
@@ -593,6 +592,17 @@ class TaskViewSet(ModelViewSet):
         file_id = task.pk  # wheather pk or exp_id
         file_path = settings.RESULT_PATH + str(file_id)
         return Response(file_path)
+
+    @action(methods=['get'], detail=False)
+    def get_task_model_dict(self, request, *args, **kwargs):
+        src_path = settings.TASK_MODEL_PATH
+        task_list = os.listdir(src_path)
+        result_dict = {}
+        # 遍历 task_list
+        for task in task_list:
+            cur_list = list(map(lambda x: os.path.splitext(x)[0], os.listdir(src_path + os.sep + task)))
+            result_dict[task] = cur_list
+        return Response(data=result_dict, status=status.HTTP_200_OK)
 
 
 class TrafficStateEtaViewSet(ModelViewSet):

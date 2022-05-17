@@ -39,13 +39,15 @@ LIBCITY_PATH = 'D:\\pyproject\\bushu\\Bigscity-LibCity'
 # 指标文件目录
 EVALUATE_PATH_PREFIX = LIBCITY_PATH + os.sep + 'libcity\\cache\\'
 EVALUATE_PATH_SUFFIX = '\\evaluate_cache\\'
-# run_model.py脚本文件位置
+# run_model.py脚本文件名称
 RUN_MODEL_PATH = 'run_model.py'
 # 激活libcity库虚拟环境命令
 # ACTIVE_VENV = 'E:\\工作内容\\python\\项目\\Bigscity-LibCity-master\\Bigscity-LibCity-master\\venv\\Scripts\\activate.bat'
 ACTIVE_VENV = 'D:\\pyproject\\bushu\\Bigscity-LibCity\\venv\\Scripts\\activate.bat'
 # libcity的log目录
 LOG_PATH = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'log' + os.sep
+# libcity的 任务-模型 对应关系配置信息目录
+TASK_MODEL_PATH = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'config' + os.sep + 'model'
 
 # 数据集文件上传路径
 DATASET_PATH = LIBCITY_PATH + os.sep + 'raw_data' + os.sep
