@@ -44,7 +44,6 @@ INSTALLED_APPS = [
     'drf_yasg',  # 接口文档
     'corsheaders',  # 跨域问题
     'rest_framework_simplejwt.token_blacklist',  # 拉黑token
-    # 'channels' # websocket
 ]
 
 # asgi支持wsgi、更多协议
@@ -237,10 +236,12 @@ EVALUATE_PATH_PREFIX = LIBCITY_PATH + os.sep +'libcity' + os.sep + 'cache' + os.
 EVALUATE_PATH_SUFFIX = os.sep + 'evaluate_cache' + os.sep
 # run_model.py脚本文件名称
 RUN_MODEL_PATH = 'run_model.py'
-# 激活libcity库虚拟环境命令
+# 激活libcity库虚拟环境命令 配置为 None 代表就是当前环境
 ACTIVE_VENV = None
 # libcity的log目录
 LOG_PATH = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'log' + os.sep
+# libcity的 任务-模型 对应关系配置信息目录
+TASK_MODEL_PATH = LIBCITY_PATH + os.sep + 'libcity' + os.sep + 'config' + os.sep + 'model'
 
 # 数据集文件上传路径
 DATASET_PATH = LIBCITY_PATH + os.sep + 'raw_data' + os.sep
