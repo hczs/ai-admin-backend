@@ -663,8 +663,12 @@ class VisHelper:
                 self.type = 'gridod'
             elif 'od' in self.data_config and ['state'] == self.data_config['od']['including_types']:
                 self.type = 'od'
-            else:
+            elif 'dyna' in self.data_config and ['trajectory'] == self.data_config['dyna']['including_types']:
                 self.type = 'trajectory'
+            else:
+                self.type = 'geo'
+            # else:
+            #     self.type = 'trajectory'
             logger.info('数据集类型: {}', self.type)
             # get geo and dyna files
             all_files = os.listdir(self.raw_path + self.dataset)
@@ -747,6 +751,10 @@ class VisHelper:
                 for od_file in self.od_file:
                     self.od_path = self.raw_path + self.dataset + '/' + od_file
                     self._visualize_od()
+            elif self.type == 'geo':
+                # geo
+                self.geo_path = self.raw_path + self.dataset + '/' + self.geo_file[0]
+                self._visualize_geo()
             self.file_form_status = DatasetStatusEnum.PROCESSING_COMPLETE.value
             return self.file_form_status
         except Exception as ex:
@@ -951,6 +959,8 @@ class VisHelper:
         geo-->json
         """
         geo_file = pd.read_csv(self.geo_path, index_col=None)
+        if "coordinates" not in list(geo_file.columns):
+            return
         geojson_obj = {'type': "FeatureCollection", 'features': []}
         logger.info('加载的 geo 文件信息')
         geo_file.info(memory_usage='deep')
@@ -966,6 +976,8 @@ class VisHelper:
             feature_i['geometry'] = {}
             feature_i['geometry']['type'] = row.type
             feature_i['geometry']['coordinates'] = eval(row.coordinates)
+            if len(feature_i['geometry']['coordinates']) == 0:
+                return
             geojson_obj['features'].append(feature_i)
 
         ensure_dir(self.save_path)
