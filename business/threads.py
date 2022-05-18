@@ -152,7 +152,7 @@ class ExpChildThread(threading.Thread):
                 task.execute_msg = str(output, "utf-8")
         except Exception as e:
             task.execute_msg = str(e)
-        task.save(update_fields=['task_status', 'execute_msg'])
+        task.save(update_fields=['task_status', 'execute_msg', 'execute_end_time'])
         # 返回原工作目录
         os.chdir(self.backup_dir)
         logger.info('execute completed! change path to: ' + os.getcwd())
