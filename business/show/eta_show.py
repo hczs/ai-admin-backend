@@ -1,3 +1,4 @@
+import ujson as json
 import os
 from string import Template
 
