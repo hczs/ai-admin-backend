@@ -555,12 +555,16 @@ def show_data_statis(url, file, error_message_list):
                 return file_view_status
         elif files.count('gridod') > 0:
             logger.info('尝试绘制' + files + '文件的[gridod]统计图象')
-            data = dd.read_csv(settings.DATASET_PATH + file + '/' + files)
-            # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
-            if 'flow' in data:
-                file_view_status = make_statis_only(data, file, tag='flow', name='flow(daily)',
-                                                    error_message_list=error_message_list, gridod=True)
-                return file_view_status
+            try:
+                data = dd.read_csv(settings.DATASET_PATH + file + '/' + files)
+                # test_dict = {'id': [], 'inflow': [], 'outflow': [], 'abs_flow': []}
+                if 'flow' in data:
+                    file_view_status = make_statis_only(data, file, tag='flow', name='flow(daily)',
+                                                        error_message_list=error_message_list, gridod=True)
+                    return file_view_status
+            except Exception as ex:
+                logger.error("{} gridod 文件读取错误，异常信息：{}", settings.DATASET_PATH + file + '/' + files, ex)
+                continue
 
 
 def form_statis_html(value_dict, asix_x, file, name1=None, name2=None):
