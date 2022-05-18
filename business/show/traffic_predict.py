@@ -42,12 +42,16 @@ def matching_result_map(dataset_file, task, background_id):
     dataset_dir = dataset_dir + "_geo_json"
     dataset_json_path = None
     dataset_grid_json_path = None
+    dataset_gridod_json_path = None
     file_list = os.listdir(dataset_dir)
     for file in file_list:
         if file.count('dyna') > 0 and file.count("truth_dyna") == 0:
             dataset_json_path = dataset_dir + os.sep + file
         elif file.count('grid') > 0:
-            dataset_grid_json_path = dataset_dir + os.sep + file
+            # grid 暂时和 dyna 走一个策略 常规json可视化策略
+            dataset_json_path = dataset_dir + os.sep + file
+        elif file.count('gridod') > 0:
+            dataset_gridod_json_path = dataset_dir + os.sep + file
     # print(dataset_json_path)
     # 生成地图
     if result_json_path and dataset_json_path:
@@ -58,9 +62,9 @@ def matching_result_map(dataset_file, task, background_id):
             render_to_map(dataset_json_path, result_json_path, background_id, map_save_path, dataset_dir)
         except Exception as ex:
             logger.error('render_to_map异常：{}', ex)
-    elif result_json_path and dataset_grid_json_path:
+    elif result_json_path and dataset_gridod_json_path:
         logger.info("The result json path is: " + result_json_path)
-        logger.info("The dataset grid json path is: " + dataset_grid_json_path)
+        logger.info("The dataset grid json path is: " + dataset_gridod_json_path)
         map_save_path = settings.ADMIN_FRONT_HTML_PATH + dataset_file.file_name + "_" + str(task.exp_id) + "_result.html"
         try:
             render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, map_save_path, dataset_dir)
@@ -139,7 +143,8 @@ def render_to_map(dataset_json_path, result_json_path, background_id, map_save_p
             folium.LayerControl(sortLayers=True).add_to(m)
             logger.info("The task result file was generated successfully, html path: " + map_save_path)
             m.save(map_save_path)
-    except Exception:
+    except Exception as ex:
+        logger.info("非网格型数据生成html，没有坐标点，开始绘制统计图像，异常信息：{}", ex)
         dif = prediction-truth
         name_list = return_data_names(dataset_dir)
         prediction_mean = (prediction.mean(axis=0)).mean(axis=0)
@@ -308,10 +313,14 @@ def return_data_names(file_path):
             else:
                 logger.error('show_data_statis grid 未找到可绘制的属性：{}', data)
                 return ['value']
-        if files.count('od') > 0:
-                return ['outflow']
-        if files.count('gridod') > 0:
-                return ['outflow']
+        if files.count('od') > 0 or files.count('gridod') > 0:
+            try:
+                data = pd.read_csv(path + '/' + files, index_col='dyna_id')
+                if 'outflow' in data:
+                    return ['outflow']
+            except Exception as ex:
+                logger.error("给出数据集的预测内容名称异常：{}", ex)
+                continue
 
 
 def make_series_list(result, dataset_json_path):
@@ -416,13 +425,14 @@ def render_grid_to_map(dataset_grid_json_path, result_json_path, background_id, 
         folium.LayerControl().add_to(m)
         logger.info("The task result file was generated successfully, html path: " + map_save_path)
         m.save(map_save_path)
-    except Exception:
+    except Exception as ex:
+        logger.info("实验结果渲染 render_grid_to_map 异常：{}", ex)
         name_list = return_data_names(dataset_dir)
         pre = ((prediction.mean(axis=0)).mean(axis=0)).mean(axis=2)
-        grid_pic_value_pre = []
         tru = ((truth.mean(axis=0)).mean(axis=0)).mean(axis=2)
-        grid_pic_value_tru = []
         dif = ((dif.mean(axis=0)).mean(axis=0)).mean(axis=2)
+        grid_pic_value_pre = []
+        grid_pic_value_tru = []
         grid_pic_value_dif = []
         for i in range(len(pre)):
             for j in range(len(pre[0])):
