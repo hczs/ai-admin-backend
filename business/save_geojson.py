@@ -1040,7 +1040,12 @@ class VisHelper:
                         for traj_id, traj_value in entity_value:
                             feature_dct = {"usr_id": entity_id, "traj_id": traj_id}
                             for f in dyna_feature_lst:
-                                feature_dct[f] = float(traj_value[f].mean())
+                                # 有的值是不能求平均的
+                                try:
+                                    feature_dct[f] = float(traj_value[f].mean())
+                                except Exception as ex:
+                                    logger.error("{} 值不能求平均, 异常信息 {}", f, ex)
+                                    feature_dct[f] = None
                             feature_i = dict()
                             feature_i['type'] = 'Feature'
                             feature_i['properties'] = feature_dct
@@ -1053,7 +1058,6 @@ class VisHelper:
                             i += 1
                     else:
                         break
-
             else:
                 for entity_id, entity_value in grouped_dyna_file:
                     feature_dct = {"usr_id": entity_id}
